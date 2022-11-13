@@ -64,6 +64,7 @@ func (iter *Iterator[T]) Drain() []T {
 	return values
 }
 
+// Reduce fully reduces the iterated collection by adding the values sequentially to the given init value.
 func Reduce[T any, U any](iter *Iterator[T], add func(U, T) U, init U) U {
 	result := init
 	for iter.Next() {
