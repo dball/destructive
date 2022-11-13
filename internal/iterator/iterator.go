@@ -7,7 +7,9 @@ type void struct{}
 // and returns true if more values are desired.
 type Accept[T any] func(T) bool
 
-// Collection is a source for iterable values.
+// Collection is a source for iterable values. Implementations are provided
+// for slices, ranges, etc. but this is intended to be implemented by novel
+// data structures and sources.
 type Collection[T any] interface {
 	Each(Accept[T])
 }
@@ -73,10 +75,10 @@ func Reduce[T any, U any](iter *Iterator[T], add func(U, T) U, init U) U {
 	return result
 }
 
-// Iterators is a collection of iterators that will be iterated consecutively.
-type Iterators[T any] []*Iterator[T]
+// iterators is a collection of iterators that will be iterated consecutively.
+type iterators[T any] []*Iterator[T]
 
-func (iters Iterators[T]) Each(accept Accept[T]) {
+func (iters iterators[T]) Each(accept Accept[T]) {
 	for i, iter := range iters {
 		for iter.Next() {
 			if !accept(iter.Value()) {
@@ -87,6 +89,11 @@ func (iters Iterators[T]) Each(accept Accept[T]) {
 			}
 		}
 	}
+}
+
+// Iterators builds an iterator which iteraates over the given iterators sequentially.
+func Iterators[T any](iters ...*Iterator[T]) *Iterator[T] {
+	return BuildIterator[T](iterators[T](iters))
 }
 
 // Slice is a wrapper type for slices.
