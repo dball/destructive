@@ -42,7 +42,7 @@ type Claim struct {
 
 // Request is a set of claims and constraints on their temporary ids.
 type Request struct {
-	Claims  []Claim
+	Claims  []*Claim
 	TempIDs map[TempID]map[IDRef]Void
 }
 

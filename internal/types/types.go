@@ -1,7 +1,10 @@
 // Package types defines the core system types.
 package types
 
-import "time"
+import (
+	"reflect"
+	"time"
+)
 
 // Void is used for values in maps used as sets.
 type Void struct{}
@@ -28,6 +31,9 @@ type Inst time.Time
 
 // Float is a floating-point number.
 type Float float64
+
+// TimeType is the type of golang's Time value.
+var TimeType = reflect.TypeOf(time.Time{})
 
 // These are the system values.
 
