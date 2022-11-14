@@ -41,12 +41,16 @@ func (s *shredder) Retract(x any) (req Request, err error) {
 	n := typ.NumField()
 	for i := 0; i < n; i++ {
 		fieldType := typ.Field(i)
-		attr := parseAttrField(fieldType)
-		if attr.Ident == "" {
+		attr, attrErr := parseAttrField(fieldType)
+		if attrErr != nil {
+			err = attrErr
+			return
+		}
+		if attr.ident == "" {
 			continue
 		}
 		fieldValue := reflect.ValueOf(x).Field(i)
-		if attr.Ident == sys.DbId {
+		if attr.ident == sys.DbId {
 			switch fieldType.Type.Kind() {
 			case reflect.Uint:
 				tempidConstraints[ID(fieldValue.Uint())] = Void{}
@@ -55,7 +59,7 @@ func (s *shredder) Retract(x any) (req Request, err error) {
 			}
 			continue
 		}
-		if attr.Unique == 0 {
+		if attr.unique == 0 {
 			continue
 		}
 		// TODO extract into helper fn
@@ -88,7 +92,7 @@ func (s *shredder) Retract(x any) (req Request, err error) {
 		}
 		// TODO the isEmpty control bit might be a flag on the struct field
 		if !v.IsEmpty() {
-			tempidConstraints[LookupRef{A: attr.Ident, V: v}] = Void{}
+			tempidConstraints[LookupRef{A: attr.ident, V: v}] = Void{}
 		}
 	}
 	return
@@ -107,12 +111,16 @@ func (s *shredder) Assert(x any) (req Request, err error) {
 	req.Claims = make([]*Claim, 0, n)
 	for i := 0; i < n; i++ {
 		fieldType := typ.Field(i)
-		attr := parseAttrField(fieldType)
-		if attr.Ident == "" {
+		attr, attrErr := parseAttrField(fieldType)
+		if attrErr != nil {
+			err = attrErr
+			return
+		}
+		if attr.ident == "" {
 			continue
 		}
 		fieldValue := reflect.ValueOf(x).Field(i)
-		if attr.Ident == sys.DbId {
+		if attr.ident == sys.DbId {
 			switch fieldType.Type.Kind() {
 			case reflect.Uint:
 				tempidConstraints[ID(fieldValue.Uint())] = Void{}
@@ -153,10 +161,10 @@ func (s *shredder) Assert(x any) (req Request, err error) {
 		if v.IsEmpty() {
 			continue
 		}
-		if attr.Unique != 0 {
-			tempidConstraints[LookupRef{A: attr.Ident, V: v}] = Void{}
+		if attr.unique != 0 {
+			tempidConstraints[LookupRef{A: attr.ident, V: v}] = Void{}
 		}
-		req.Claims = append(req.Claims, &Claim{E: e, A: attr.Ident, V: vref})
+		req.Claims = append(req.Claims, &Claim{E: e, A: attr.ident, V: vref})
 	}
 	return
 }
