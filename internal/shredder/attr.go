@@ -11,9 +11,10 @@ import (
 // attrTags is a partial representation of an attr and hints on how
 // how it is realized on a struct field
 type attrTag struct {
-	ident  Ident
-	unique ID
-	typ    ID
+	ident       Ident
+	unique      ID
+	typ         ID
+	ignoreEmpty bool
 }
 
 func parseAttrTag(tag string) (attr attrTag, err error) {
@@ -34,6 +35,8 @@ func parseAttrTag(tag string) (attr attrTag, err error) {
 				return
 			}
 			attr.unique = sys.AttrUniqueValue
+		case "ignoreempty":
+			attr.ignoreEmpty = true
 		default:
 			err = NewError("shredder.invalidDirective", "tag", tag)
 			return

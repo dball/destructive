@@ -90,10 +90,10 @@ func (s *shredder) Retract(x any) (req Request, err error) {
 			// TODO panic or err or
 			continue
 		}
-		// TODO the isEmpty control bit might be a flag on the struct field
-		if !v.IsEmpty() {
-			tempidConstraints[LookupRef{A: attr.ident, V: v}] = Void{}
+		if attr.ignoreEmpty && v.IsEmpty() {
+			continue
 		}
+		tempidConstraints[LookupRef{A: attr.ident, V: v}] = Void{}
 	}
 	return
 }
@@ -157,8 +157,7 @@ func (s *shredder) Assert(x any) (req Request, err error) {
 			// TODO panic or err or
 			continue
 		}
-		// TODO the isEmpty control bit might be a flag on the struct field
-		if v.IsEmpty() {
+		if attr.ignoreEmpty && v.IsEmpty() {
 			continue
 		}
 		if attr.unique != 0 {

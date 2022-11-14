@@ -11,11 +11,11 @@ func TestShred(t *testing.T) {
 	type person struct {
 		id   uint   `attr:"sys/db/id"`
 		name string `attr:"person/name,unique"`
-		uuid string `attr:"person/uuid,identity"`
-		age  int    `attr:"person/age"`
+		uuid string `attr:"person/uuid,identity,ignoreempty"`
+		age  int    `attr:"person/age,ignoreempty"`
 	}
 
-	t.Run("Retract", func(t *testing.T) {
+	t.Run("retract", func(t *testing.T) {
 		shredder := NewShredder()
 		txn, err := shredder.Retract(person{id: 23, name: "Donald", age: 48})
 		assert.NoError(t, err)
@@ -32,7 +32,7 @@ func TestShred(t *testing.T) {
 		assert.Equal(t, expected, txn)
 	})
 
-	t.Run("Assert", func(t *testing.T) {
+	t.Run("assert", func(t *testing.T) {
 		shredder := NewShredder()
 		txn, err := shredder.Assert(person{id: 23, name: "Donald", age: 48})
 		assert.NoError(t, err)
@@ -46,6 +46,27 @@ func TestShred(t *testing.T) {
 				TempID("1"): {
 					ID(23): Void{},
 					LookupRef{A: Ident("person/name"), V: String("Donald")}: Void{},
+				},
+			},
+		}
+		assert.Equal(t, expected, txn)
+	})
+
+	t.Run("assert with non-empty uuid", func(t *testing.T) {
+		shredder := NewShredder()
+		txn, err := shredder.Assert(person{id: 23, name: "Donald", uuid: "the-uuid"})
+		assert.NoError(t, err)
+
+		expected := Request{
+			Claims: []*Claim{
+				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
+				{E: TempID("1"), A: Ident("person/uuid"), V: String("the-uuid")},
+			},
+			TempIDs: map[TempID]map[IDRef]Void{
+				TempID("1"): {
+					ID(23): Void{},
+					LookupRef{A: Ident("person/name"), V: String("Donald")}:   Void{},
+					LookupRef{A: Ident("person/uuid"), V: String("the-uuid")}: Void{},
 				},
 			},
 		}
