@@ -2,6 +2,7 @@ package shredder
 
 import (
 	"testing"
+	"time"
 
 	. "github.com/dball/destructive/internal/types"
 	"github.com/stretchr/testify/assert"
@@ -14,14 +15,21 @@ func TestShred(t *testing.T) {
 		uuid string `attr:"person/uuid,identity,ignoreempty"`
 		age  int    `attr:"person/age,ignoreempty"`
 		pets *int   `attr:"person/pets"`
+		// struct fields must be public to be shredded unless we go unsafe
+		Birthdate time.Time `attr:"person/birthdate,ignoreempty"`
 	}
 
-	t.Run("retract", func(t *testing.T) {
+	t.Run("assert", func(t *testing.T) {
 		shredder := NewShredder()
-		txn, err := shredder.Retract(person{id: 23, name: "Donald", age: 48})
+		epoch := time.Date(1969, 7, 20, 20, 17, 54, 0, time.UTC)
+		txn, err := shredder.Assert(person{id: 23, name: "Donald", age: 48, Birthdate: epoch})
 		assert.NoError(t, err)
 		expected := Request{
-			Claims: []*Claim{{E: TempID("1"), A: nil, V: nil, Retract: true}},
+			Claims: []*Claim{
+				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
+				{E: TempID("1"), A: Ident("person/age"), V: Int(48)},
+				{E: TempID("1"), A: Ident("person/birthdate"), V: Inst(epoch)},
+			},
 			TempIDs: map[TempID]map[IDRef]Void{
 				TempID("1"): {
 					ID(23): Void{},
@@ -32,15 +40,12 @@ func TestShred(t *testing.T) {
 		assert.Equal(t, expected, txn)
 	})
 
-	t.Run("assert", func(t *testing.T) {
+	t.Run("retract", func(t *testing.T) {
 		shredder := NewShredder()
-		txn, err := shredder.Assert(person{id: 23, name: "Donald", age: 48})
+		txn, err := shredder.Retract(person{id: 23, name: "Donald", age: 48})
 		assert.NoError(t, err)
 		expected := Request{
-			Claims: []*Claim{
-				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
-				{E: TempID("1"), A: Ident("person/age"), V: Int(48)},
-			},
+			Claims: []*Claim{{E: TempID("1"), A: nil, V: nil, Retract: true}},
 			TempIDs: map[TempID]map[IDRef]Void{
 				TempID("1"): {
 					ID(23): Void{},
