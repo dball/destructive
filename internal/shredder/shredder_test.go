@@ -105,3 +105,36 @@ func TestShred(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestRefs(t *testing.T) {
+	type Person struct {
+		Name string  `attr:"person/name"`
+		BFF  *Person `attr:"person/bff"`
+	}
+
+	t.SkipNow()
+
+	t.Run("two mutuals", func(t *testing.T) {
+		shredder := NewShredder()
+		momo := Person{Name: "Momo"}
+		pabu := Person{Name: "Pabu"}
+		momo.BFF = &pabu
+		pabu.BFF = &momo
+		actual, err := shredder.Assert(momo)
+		assert.NoError(t, err)
+		expected := Request{
+			Claims: []*Claim{
+				{E: TempID("1"), A: Ident("person/name"), V: String("Momo")},
+				{E: TempID("1"), A: Ident("person/bff"), V: TempID("2")},
+				{E: TempID("2"), A: Ident("person/name"), V: String("Pabu")},
+				{E: TempID("2"), A: Ident("person/bff"), V: TempID("1")},
+			},
+			TempIDs: map[TempID]map[IDRef]Void{
+				TempID("1"): {},
+				TempID("2"): {},
+			},
+		}
+		assert.Equal(t, expected, actual)
+	})
+
+}
