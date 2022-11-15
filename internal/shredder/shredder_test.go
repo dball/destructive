@@ -16,7 +16,8 @@ func TestShred(t *testing.T) {
 		age  int    `attr:"person/age,ignoreempty"`
 		pets *int   `attr:"person/pets"`
 		// struct fields must be public to be shredded unless we go unsafe
-		Birthdate time.Time `attr:"person/birthdate,ignoreempty"`
+		Birthdate time.Time  `attr:"person/birthdate,ignoreempty"`
+		Deathdate *time.Time `attr:"person/deathdate"`
 	}
 
 	t.Run("assert", func(t *testing.T) {
@@ -79,12 +80,14 @@ func TestShred(t *testing.T) {
 	t.Run("pointer value", func(t *testing.T) {
 		shredder := NewShredder()
 		four := 4
-		txn, err := shredder.Assert(person{name: "Donald", pets: &four})
+		epoch := time.Date(1969, 7, 20, 20, 17, 54, 0, time.UTC)
+		txn, err := shredder.Assert(person{name: "Donald", pets: &four, Deathdate: &epoch})
 		assert.NoError(t, err)
 		expected := Request{
 			Claims: []*Claim{
 				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 				{E: TempID("1"), A: Ident("person/pets"), V: Int(4)},
+				{E: TempID("1"), A: Ident("person/deathdate"), V: Inst(epoch)},
 			},
 			TempIDs: map[TempID]map[IDRef]Void{
 				TempID("1"): {
