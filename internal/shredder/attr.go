@@ -15,6 +15,7 @@ type attrTag struct {
 	unique      ID
 	typ         ID
 	ignoreEmpty bool
+	pointer     bool
 }
 
 func parseAttrTag(tag string) (attr attrTag, err error) {
@@ -76,8 +77,27 @@ func parseAttrField(field reflect.StructField) (attr attrTag, err error) {
 		} else {
 			attr.typ = sys.AttrTypeRef
 		}
+	case reflect.Pointer:
+		attr.pointer = true
+		// This repeats the outer switch, but without the pointer case.
+		switch field.Type.Elem().Kind() {
+		case reflect.Bool:
+			attr.typ = sys.AttrTypeBool
+		case reflect.Int:
+			attr.typ = sys.AttrTypeInt
+		case reflect.String:
+			attr.typ = sys.AttrTypeString
+		case reflect.Float64:
+			attr.typ = sys.AttrTypeFloat
+		case reflect.Struct:
+			if TimeType == field.Type {
+				attr.typ = sys.AttrTypeInst
+			} else {
+				attr.typ = sys.AttrTypeRef
+			}
+		}
 	default:
-		panic("Invalid attr field type")
+		err = NewError("shredder.invalidType", "tag", tag, "type", field.Type, "kind", field.Type.Kind())
 	}
 	return
 }

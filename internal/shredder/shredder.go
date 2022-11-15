@@ -2,10 +2,8 @@
 package shredder
 
 import (
-	"errors"
 	"reflect"
 	"strconv"
-	"time"
 
 	"github.com/dball/destructive/internal/sys"
 	. "github.com/dball/destructive/internal/types"
@@ -28,83 +26,13 @@ func (s *shredder) nextTempID() TempID {
 	return TempID(strconv.FormatUint(uint64(id), 10))
 }
 
-func (s *shredder) Retract(x any) (req Request, err error) {
-	e := s.nextTempID()
-	req.Claims = []*Claim{{E: e, Retract: true}}
-	tempidConstraints := map[IDRef]Void{}
-	req.TempIDs = map[TempID]map[IDRef]Void{e: tempidConstraints}
-	typ := reflect.TypeOf(x)
-	if typ.Kind() != reflect.Struct {
-		err = errors.New("invalid type")
-		return
-	}
-	n := typ.NumField()
-	for i := 0; i < n; i++ {
-		fieldType := typ.Field(i)
-		attr, attrErr := parseAttrField(fieldType)
-		if attrErr != nil {
-			err = attrErr
-			return
-		}
-		if attr.ident == "" {
-			continue
-		}
-		fieldValue := reflect.ValueOf(x).Field(i)
-		if attr.ident == sys.DbId {
-			switch fieldType.Type.Kind() {
-			case reflect.Uint:
-				tempidConstraints[ID(fieldValue.Uint())] = Void{}
-			default:
-				// TODO error?
-			}
-			continue
-		}
-		if attr.unique == 0 {
-			continue
-		}
-		// TODO extract into helper fn
-		var vref VRef
-		switch fieldType.Type.Kind() {
-		case reflect.Bool:
-			vref = Bool(fieldValue.Bool())
-		case reflect.Int:
-			vref = Int(fieldValue.Int())
-		case reflect.String:
-			vref = String(fieldValue.String())
-		case reflect.Struct:
-			v := fieldValue.Interface()
-			switch typed := v.(type) {
-			case time.Time:
-				vref = Inst(typed)
-			default:
-				// TODO recurse, but that probably means we need to pass along the req?
-			}
-		case reflect.Float64:
-			vref = Float(fieldValue.Float())
-		default:
-			// TODO error?
-			continue
-		}
-		v, ok := vref.(Value)
-		if !ok {
-			// TODO panic or err or
-			continue
-		}
-		if attr.ignoreEmpty && v.IsEmpty() {
-			continue
-		}
-		tempidConstraints[LookupRef{A: attr.ident, V: v}] = Void{}
-	}
-	return
-}
-
 func (s *shredder) Assert(x any) (req Request, err error) {
 	e := s.nextTempID()
 	tempidConstraints := map[IDRef]Void{}
 	req.TempIDs = map[TempID]map[IDRef]Void{e: tempidConstraints}
 	typ := reflect.TypeOf(x)
 	if typ.Kind() != reflect.Struct {
-		err = errors.New("invalid type")
+		err = NewError("shredder.invalidStruct", "type", typ)
 		return
 	}
 	n := typ.NumField()
@@ -123,39 +51,28 @@ func (s *shredder) Assert(x any) (req Request, err error) {
 		if attr.ident == sys.DbId {
 			switch fieldType.Type.Kind() {
 			case reflect.Uint:
+				if fieldValue.IsZero() {
+					continue
+				}
 				tempidConstraints[ID(fieldValue.Uint())] = Void{}
 			default:
-				// TODO error?
+				err = NewError("shredder.invalidIdFieldType", "type", fieldType)
+				return
 			}
 			continue
 		}
-		// TODO extract into helper fn
-		var vref VRef
-		switch fieldType.Type.Kind() {
-		case reflect.Bool:
-			vref = Bool(fieldValue.Bool())
-		case reflect.Int:
-			vref = Int(fieldValue.Int())
-		case reflect.String:
-			vref = String(fieldValue.String())
-		case reflect.Struct:
-			v := fieldValue.Interface()
-			switch typed := v.(type) {
-			case time.Time:
-				vref = Inst(typed)
-			default:
-				// TODO recurse, but that probably means we need to pass along the req?
-			}
-		case reflect.Float64:
-			vref = Float(fieldValue.Float())
-		default:
-			// TODO error?
+		vref, fieldErr := getFieldValue(fieldType, fieldValue)
+		if fieldErr != nil {
+			err = fieldErr
+			return
+		}
+		if vref == nil {
 			continue
 		}
 		v, ok := vref.(Value)
 		if !ok {
-			// TODO panic or err or
-			continue
+			err = NewError("shredder.invalidValue", "value", vref)
+			return
 		}
 		if attr.ignoreEmpty && v.IsEmpty() {
 			continue
@@ -164,6 +81,68 @@ func (s *shredder) Assert(x any) (req Request, err error) {
 			tempidConstraints[LookupRef{A: attr.ident, V: v}] = Void{}
 		}
 		req.Claims = append(req.Claims, &Claim{E: e, A: attr.ident, V: vref})
+	}
+	return
+}
+
+func (s *shredder) Retract(x any) (req Request, err error) {
+	e := s.nextTempID()
+	req.Claims = []*Claim{{E: e, Retract: true}}
+	tempidConstraints := map[IDRef]Void{}
+	req.TempIDs = map[TempID]map[IDRef]Void{e: tempidConstraints}
+	typ := reflect.TypeOf(x)
+	if typ.Kind() != reflect.Struct {
+		err = NewError("shredder.invalidStruct", "type", typ)
+		return
+	}
+	n := typ.NumField()
+	for i := 0; i < n; i++ {
+		fieldType := typ.Field(i)
+		attr, attrErr := parseAttrField(fieldType)
+		if attrErr != nil {
+			err = attrErr
+			return
+		}
+		if attr.ident == "" {
+			continue
+		}
+		fieldValue := reflect.ValueOf(x).Field(i)
+		if attr.ident == sys.DbId {
+			switch fieldType.Type.Kind() {
+			case reflect.Uint:
+				if fieldValue.IsZero() {
+					continue
+				}
+				tempidConstraints[ID(fieldValue.Uint())] = Void{}
+			default:
+				err = NewError("shredder.invalidIdFieldType", "type", fieldType)
+				return
+			}
+			continue
+		}
+		if attr.unique == 0 {
+			continue
+		}
+		vref, fieldErr := getFieldValue(fieldType, fieldValue)
+		if fieldErr != nil {
+			err = fieldErr
+			return
+		}
+		if vref == nil {
+			continue
+		}
+		v, ok := vref.(Value)
+		if !ok {
+			err = NewError("shredder.invalidValue", "value", vref)
+			return
+		}
+		if attr.ignoreEmpty && v.IsEmpty() {
+			continue
+		}
+		tempidConstraints[LookupRef{A: attr.ident, V: v}] = Void{}
+	}
+	if len(tempidConstraints) == 0 {
+		err = NewError("shredder.unidentifiedRetract")
 	}
 	return
 }
