@@ -23,7 +23,8 @@ func TestShred(t *testing.T) {
 	t.Run("assert", func(t *testing.T) {
 		shredder := NewShredder()
 		epoch := time.Date(1969, 7, 20, 20, 17, 54, 0, time.UTC)
-		txn, err := shredder.Assert(person{id: 23, name: "Donald", age: 48, Birthdate: epoch})
+		p := person{id: 23, name: "Donald", age: 48, Birthdate: epoch}
+		req, err := shredder.Shred(Document{Assertions: []any{p}})
 		assert.NoError(t, err)
 		expected := Request{
 			Claims: []*Claim{
@@ -38,12 +39,13 @@ func TestShred(t *testing.T) {
 				},
 			},
 		}
-		assert.Equal(t, expected, txn)
+		assert.Equal(t, expected, req)
 	})
 
 	t.Run("retract", func(t *testing.T) {
 		shredder := NewShredder()
-		txn, err := shredder.Retract(person{id: 23, name: "Donald", age: 48})
+		p := person{id: 23, name: "Donald", age: 48}
+		req, err := shredder.Shred(Document{Retractions: []any{p}})
 		assert.NoError(t, err)
 		expected := Request{
 			Claims: []*Claim{{E: TempID("1"), A: nil, V: nil, Retract: true}},
@@ -54,12 +56,13 @@ func TestShred(t *testing.T) {
 				},
 			},
 		}
-		assert.Equal(t, expected, txn)
+		assert.Equal(t, expected, req)
 	})
 
 	t.Run("non-empty uuid", func(t *testing.T) {
 		shredder := NewShredder()
-		txn, err := shredder.Assert(person{id: 23, name: "Donald", uuid: "the-uuid"})
+		p := person{id: 23, name: "Donald", uuid: "the-uuid"}
+		req, err := shredder.Shred(Document{Assertions: []any{p}})
 		assert.NoError(t, err)
 		expected := Request{
 			Claims: []*Claim{
@@ -74,14 +77,15 @@ func TestShred(t *testing.T) {
 				},
 			},
 		}
-		assert.Equal(t, expected, txn)
+		assert.Equal(t, expected, req)
 	})
 
 	t.Run("pointer value", func(t *testing.T) {
 		shredder := NewShredder()
 		four := 4
 		epoch := time.Date(1969, 7, 20, 20, 17, 54, 0, time.UTC)
-		txn, err := shredder.Assert(person{name: "Donald", pets: &four, Deathdate: &epoch})
+		p := person{name: "Donald", pets: &four, Deathdate: &epoch}
+		req, err := shredder.Shred(Document{Assertions: []any{p}})
 		assert.NoError(t, err)
 		expected := Request{
 			Claims: []*Claim{
@@ -95,13 +99,13 @@ func TestShred(t *testing.T) {
 				},
 			},
 		}
-		assert.Equal(t, expected, txn)
+		assert.Equal(t, expected, req)
 
 	})
 
 	t.Run("invalid values", func(t *testing.T) {
 		shredder := NewShredder()
-		_, err := shredder.Assert(5)
+		_, err := shredder.Shred(Document{Assertions: []any{5}})
 		assert.Error(t, err)
 	})
 }
@@ -120,7 +124,7 @@ func TestRefs(t *testing.T) {
 		pabu := Person{Name: "Pabu"}
 		momo.BFF = &pabu
 		pabu.BFF = &momo
-		actual, err := shredder.Assert(momo)
+		actual, err := shredder.Shred(Document{Assertions: []any{momo, pabu}})
 		assert.NoError(t, err)
 		expected := Request{
 			Claims: []*Claim{

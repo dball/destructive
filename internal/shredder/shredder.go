@@ -9,15 +9,25 @@ import (
 	. "github.com/dball/destructive/internal/types"
 )
 
+// Document contains the lists of structs to assert or retract.
+type Document struct {
+	Retractions []any
+	Assertions  []any
+}
+
 // Shredder shreds structs into claims.
 type Shredder interface {
-	Retract(x any) (req Request, err error)
-	Assert(x any) (req Request, err error)
+	Shred(doc Document) (req Request, err error)
 }
 
 // shredder is a stateful shredder.
 type shredder struct {
 	nextID uint64
+}
+
+// NewShredder returns a new shredder.
+func NewShredder() Shredder {
+	return &shredder{nextID: uint64(1)}
 }
 
 func (s *shredder) nextTempID() TempID {
@@ -26,17 +36,36 @@ func (s *shredder) nextTempID() TempID {
 	return TempID(strconv.FormatUint(uint64(id), 10))
 }
 
-func (s *shredder) Assert(x any) (req Request, err error) {
+func (s *shredder) Shred(doc Document) (req Request, err error) {
+	total := len(doc.Assertions) + len(doc.Retractions)
+	req.TempIDs = make(map[TempID]map[IDRef]Void, total)
+	// The likely size here is actually assertions*numFields + retractions
+	req.Claims = make([]*Claim, 0, total)
+	for _, x := range doc.Retractions {
+		err = s.retract(&req, x)
+		if err != nil {
+			return
+		}
+	}
+	for _, x := range doc.Assertions {
+		err = s.assert(&req, x)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+func (s *shredder) assert(req *Request, x any) (err error) {
 	e := s.nextTempID()
 	tempidConstraints := map[IDRef]Void{}
-	req.TempIDs = map[TempID]map[IDRef]Void{e: tempidConstraints}
+	req.TempIDs[e] = tempidConstraints
 	typ := reflect.TypeOf(x)
 	if typ.Kind() != reflect.Struct {
 		err = NewError("shredder.invalidStruct", "type", typ)
 		return
 	}
 	n := typ.NumField()
-	req.Claims = make([]*Claim, 0, n)
 	for i := 0; i < n; i++ {
 		fieldType := typ.Field(i)
 		attr, attrErr := parseAttrField(fieldType)
@@ -85,11 +114,11 @@ func (s *shredder) Assert(x any) (req Request, err error) {
 	return
 }
 
-func (s *shredder) Retract(x any) (req Request, err error) {
+func (s *shredder) retract(req *Request, x any) (err error) {
 	e := s.nextTempID()
-	req.Claims = []*Claim{{E: e, Retract: true}}
+	req.Claims = append(req.Claims, &Claim{E: e, Retract: true})
 	tempidConstraints := map[IDRef]Void{}
-	req.TempIDs = map[TempID]map[IDRef]Void{e: tempidConstraints}
+	req.TempIDs[e] = tempidConstraints
 	typ := reflect.TypeOf(x)
 	if typ.Kind() != reflect.Struct {
 		err = NewError("shredder.invalidStruct", "type", typ)
@@ -145,9 +174,4 @@ func (s *shredder) Retract(x any) (req Request, err error) {
 		err = NewError("shredder.unidentifiedRetract")
 	}
 	return
-}
-
-// NewShredder returns a new shredder.
-func NewShredder() Shredder {
-	return &shredder{nextID: uint64(1)}
 }
