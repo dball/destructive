@@ -7,7 +7,7 @@ import (
 	. "github.com/dball/destructive/internal/types"
 )
 
-func getFieldValue(fieldType reflect.StructField, fieldValue reflect.Value) (vref VRef, err error) {
+func getFieldValue(pointers map[reflect.Value]TempID, fieldType reflect.StructField, fieldValue reflect.Value) (vref VRef, err error) {
 	switch fieldType.Type.Kind() {
 	case reflect.Bool:
 		vref = Bool(fieldValue.Bool())
@@ -40,7 +40,12 @@ func getFieldValue(fieldType reflect.StructField, fieldValue reflect.Value) (vre
 				case time.Time:
 					vref = Inst(typed)
 				default:
-					// TODO recurse, but that probably means we need to pass along the req?
+					tempid, ok := pointers[fieldValue.Elem().Addr()]
+					if ok {
+						vref = tempid
+					} else {
+						// TODO recurse, but that probably means we need to pass along the req?
+					}
 				}
 			}
 		}

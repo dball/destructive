@@ -116,15 +116,13 @@ func TestRefs(t *testing.T) {
 		BFF  *Person `attr:"person/bff"`
 	}
 
-	t.SkipNow()
-
 	t.Run("two mutuals", func(t *testing.T) {
 		shredder := NewShredder()
 		momo := Person{Name: "Momo"}
 		pabu := Person{Name: "Pabu"}
 		momo.BFF = &pabu
 		pabu.BFF = &momo
-		actual, err := shredder.Shred(Document{Assertions: []any{momo, pabu}})
+		actual, err := shredder.Shred(Document{Assertions: []any{&momo, &pabu}})
 		assert.NoError(t, err)
 		expected := Request{
 			Claims: []*Claim{

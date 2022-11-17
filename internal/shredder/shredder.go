@@ -41,14 +41,15 @@ func (s *shredder) Shred(doc Document) (req Request, err error) {
 	req.TempIDs = make(map[TempID]map[IDRef]Void, total)
 	// The likely size here is actually assertions*numFields + retractions
 	req.Claims = make([]*Claim, 0, total)
+	pointers := make(map[reflect.Value]TempID, total)
 	for _, x := range doc.Retractions {
-		err = s.retract(&req, x)
+		err = s.retract(&req, pointers, x)
 		if err != nil {
 			return
 		}
 	}
 	for _, x := range doc.Assertions {
-		err = s.assert(&req, x)
+		err = s.assert(&req, pointers, x)
 		if err != nil {
 			return
 		}
@@ -56,12 +57,25 @@ func (s *shredder) Shred(doc Document) (req Request, err error) {
 	return
 }
 
-func (s *shredder) assert(req *Request, x any) (err error) {
+func (s *shredder) assert(req *Request, pointers map[reflect.Value]TempID, x any) (err error) {
 	e := s.nextTempID()
 	tempidConstraints := map[IDRef]Void{}
 	req.TempIDs[e] = tempidConstraints
 	typ := reflect.TypeOf(x)
-	if typ.Kind() != reflect.Struct {
+	var fields reflect.Value
+	switch typ.Kind() {
+	case reflect.Struct:
+		fields = reflect.ValueOf(x)
+	case reflect.Pointer:
+		ptr := reflect.ValueOf(x)
+		if ptr.IsNil() {
+			err = NewError("shredder.nilStruct")
+			return
+		}
+		pointers[ptr] = e
+		fields = ptr.Elem()
+		typ = fields.Type()
+	default:
 		err = NewError("shredder.invalidStruct", "type", typ)
 		return
 	}
@@ -76,7 +90,7 @@ func (s *shredder) assert(req *Request, x any) (err error) {
 		if attr.ident == "" {
 			continue
 		}
-		fieldValue := reflect.ValueOf(x).Field(i)
+		fieldValue := fields.Field(i)
 		if attr.ident == sys.DbId {
 			switch fieldType.Type.Kind() {
 			case reflect.Uint:
@@ -90,7 +104,7 @@ func (s *shredder) assert(req *Request, x any) (err error) {
 			}
 			continue
 		}
-		vref, fieldErr := getFieldValue(fieldType, fieldValue)
+		vref, fieldErr := getFieldValue(pointers, fieldType, fieldValue)
 		if fieldErr != nil {
 			err = fieldErr
 			return
@@ -99,22 +113,20 @@ func (s *shredder) assert(req *Request, x any) (err error) {
 			continue
 		}
 		v, ok := vref.(Value)
-		if !ok {
-			err = NewError("shredder.invalidValue", "value", vref)
-			return
-		}
-		if attr.ignoreEmpty && v.IsEmpty() {
-			continue
-		}
-		if attr.unique != 0 {
-			tempidConstraints[LookupRef{A: attr.ident, V: v}] = Void{}
+		if ok {
+			if attr.ignoreEmpty && v.IsEmpty() {
+				continue
+			}
+			if attr.unique != 0 {
+				tempidConstraints[LookupRef{A: attr.ident, V: v}] = Void{}
+			}
 		}
 		req.Claims = append(req.Claims, &Claim{E: e, A: attr.ident, V: vref})
 	}
 	return
 }
 
-func (s *shredder) retract(req *Request, x any) (err error) {
+func (s *shredder) retract(req *Request, pointers map[reflect.Value]TempID, x any) (err error) {
 	e := s.nextTempID()
 	req.Claims = append(req.Claims, &Claim{E: e, Retract: true})
 	tempidConstraints := map[IDRef]Void{}
@@ -152,7 +164,7 @@ func (s *shredder) retract(req *Request, x any) (err error) {
 		if attr.unique == 0 {
 			continue
 		}
-		vref, fieldErr := getFieldValue(fieldType, fieldValue)
+		vref, fieldErr := getFieldValue(pointers, fieldType, fieldValue)
 		if fieldErr != nil {
 			err = fieldErr
 			return
@@ -162,8 +174,7 @@ func (s *shredder) retract(req *Request, x any) (err error) {
 		}
 		v, ok := vref.(Value)
 		if !ok {
-			err = NewError("shredder.invalidValue", "value", vref)
-			return
+			continue
 		}
 		if attr.ignoreEmpty && v.IsEmpty() {
 			continue
