@@ -58,14 +58,15 @@ func (s *shredder) Shred(doc Document) (req Request, err error) {
 }
 
 func (s *shredder) assert(req *Request, pointers map[reflect.Value]TempID, x any) (e TempID, err error) {
-	e = s.nextTempID()
-	tempidConstraints := map[IDRef]Void{}
-	req.TempIDs[e] = tempidConstraints
+	var tempidConstraints map[IDRef]Void
 	typ := reflect.TypeOf(x)
 	var fields reflect.Value
 	switch typ.Kind() {
 	case reflect.Struct:
 		fields = reflect.ValueOf(x)
+		e = s.nextTempID()
+		tempidConstraints = map[IDRef]Void{}
+		req.TempIDs[e] = tempidConstraints
 	case reflect.Pointer:
 		ptr := reflect.ValueOf(x)
 		if ptr.IsNil() {
@@ -74,9 +75,11 @@ func (s *shredder) assert(req *Request, pointers map[reflect.Value]TempID, x any
 		}
 		_, ok := pointers[ptr]
 		if ok {
-			// TODO shouldn't allocate e until after this or something
 			return
 		}
+		e = s.nextTempID()
+		tempidConstraints = map[IDRef]Void{}
+		req.TempIDs[e] = tempidConstraints
 		pointers[ptr] = e
 		fields = ptr.Elem()
 		typ = fields.Type()
