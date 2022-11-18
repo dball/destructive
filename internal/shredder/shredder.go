@@ -49,7 +49,7 @@ func (s *shredder) Shred(doc Document) (req Request, err error) {
 		}
 	}
 	for _, x := range doc.Assertions {
-		err = s.assert(&req, pointers, x)
+		_, err = s.assert(&req, pointers, x)
 		if err != nil {
 			return
 		}
@@ -57,8 +57,8 @@ func (s *shredder) Shred(doc Document) (req Request, err error) {
 	return
 }
 
-func (s *shredder) assert(req *Request, pointers map[reflect.Value]TempID, x any) (err error) {
-	e := s.nextTempID()
+func (s *shredder) assert(req *Request, pointers map[reflect.Value]TempID, x any) (e TempID, err error) {
+	e = s.nextTempID()
 	tempidConstraints := map[IDRef]Void{}
 	req.TempIDs[e] = tempidConstraints
 	typ := reflect.TypeOf(x)
@@ -70,6 +70,11 @@ func (s *shredder) assert(req *Request, pointers map[reflect.Value]TempID, x any
 		ptr := reflect.ValueOf(x)
 		if ptr.IsNil() {
 			err = NewError("shredder.nilStruct")
+			return
+		}
+		_, ok := pointers[ptr]
+		if ok {
+			// TODO shouldn't allocate e until after this or something
 			return
 		}
 		pointers[ptr] = e
@@ -104,21 +109,31 @@ func (s *shredder) assert(req *Request, pointers map[reflect.Value]TempID, x any
 			}
 			continue
 		}
-		vref, fieldErr := getFieldValue(pointers, fieldType, fieldValue)
+		val, fieldErr := getFieldValue(pointers, fieldType, fieldValue)
 		if fieldErr != nil {
 			err = fieldErr
 			return
 		}
-		if vref == nil {
+		if val == nil {
 			continue
 		}
-		v, ok := vref.(Value)
-		if ok {
+		var vref VRef
+		switch v := val.(type) {
+		case Value:
+			vref = v.(VRef)
 			if attr.ignoreEmpty && v.IsEmpty() {
 				continue
 			}
 			if attr.unique != 0 {
 				tempidConstraints[LookupRef{A: attr.ident, V: v}] = Void{}
+			}
+		case TempID:
+			vref = v
+			// TODO idk if tempid constraints are legit or not
+		default:
+			vref, err = s.assert(req, pointers, v)
+			if err != nil {
+				return
 			}
 		}
 		req.Claims = append(req.Claims, &Claim{E: e, A: attr.ident, V: vref})

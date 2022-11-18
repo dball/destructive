@@ -127,9 +127,9 @@ func TestRefs(t *testing.T) {
 		expected := Request{
 			Claims: []*Claim{
 				{E: TempID("1"), A: Ident("person/name"), V: String("Momo")},
-				{E: TempID("1"), A: Ident("person/bff"), V: TempID("2")},
 				{E: TempID("2"), A: Ident("person/name"), V: String("Pabu")},
 				{E: TempID("2"), A: Ident("person/bff"), V: TempID("1")},
+				{E: TempID("1"), A: Ident("person/bff"), V: TempID("2")},
 			},
 			TempIDs: map[TempID]map[IDRef]Void{
 				TempID("1"): {},
