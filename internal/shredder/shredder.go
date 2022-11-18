@@ -134,6 +134,8 @@ func (s *shredder) assert(req *Request, pointers map[reflect.Value]TempID, x any
 			vref = v
 			// TODO idk if tempid constraints are legit or not
 		default:
+			// TODO we'll have better insert performance if we defer appending these claims until this
+			// entity is finished. Easier to write tests as well.
 			vref, err = s.assert(req, pointers, v)
 			if err != nil {
 				return

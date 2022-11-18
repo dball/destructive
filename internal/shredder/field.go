@@ -40,12 +40,12 @@ func getFieldValue(pointers map[reflect.Value]TempID, fieldType reflect.StructFi
 				case time.Time:
 					val = Inst(typed)
 				default:
-					tempid, ok := pointers[fieldValue.Elem().Addr()]
-
+					ptr := fieldValue.Elem().Addr()
+					tempid, ok := pointers[ptr]
 					if ok {
 						val = tempid
 					} else {
-						val = fieldValue.Elem().Addr().Interface()
+						val = ptr.Interface()
 					}
 				}
 			}
