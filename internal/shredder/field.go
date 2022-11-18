@@ -21,7 +21,7 @@ func getFieldValue(pointers map[reflect.Value]TempID, fieldType reflect.StructFi
 		case time.Time:
 			val = Inst(typed)
 		default:
-			// TODO recurse, but that probably means we need to pass along the req?
+			val = fieldValue.Interface()
 		}
 	case reflect.Float64:
 		val = Float(fieldValue.Float())

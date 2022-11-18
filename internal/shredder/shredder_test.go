@@ -159,7 +159,11 @@ func TestStructs(t *testing.T) {
 			Claims: []*Claim{
 				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 				{E: TempID("2"), A: Ident("book/title"), V: String("Immortality")},
-				{E: TempID("1"), A: Ident("person/favorite"), V: TempID("2")},
+				{E: TempID("1"), A: Ident("person/favorite-book"), V: TempID("2")},
+			},
+			TempIDs: map[TempID]map[IDRef]Void{
+				TempID("1"): {},
+				TempID("2"): {},
 			},
 		}
 		assert.Equal(t, expected, actual)
