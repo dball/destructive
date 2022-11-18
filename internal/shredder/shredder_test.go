@@ -138,5 +138,30 @@ func TestRefs(t *testing.T) {
 		}
 		assert.Equal(t, expected, actual)
 	})
+}
 
+func TestStructs(t *testing.T) {
+	type Book struct {
+		Title string `attr:"book/title"`
+	}
+
+	type Person struct {
+		Name     string `attr:"person/name"`
+		Favorite Book   `attr:"person/favorite-book"`
+	}
+
+	t.Run("value struct field", func(t *testing.T) {
+		shredder := NewShredder()
+		me := Person{Name: "Donald", Favorite: Book{Title: "Immortality"}}
+		actual, err := shredder.Shred(Document{Assertions: []any{me}})
+		assert.NoError(t, err)
+		expected := Request{
+			Claims: []*Claim{
+				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
+				{E: TempID("2"), A: Ident("book/title"), V: String("Immortality")},
+				{E: TempID("1"), A: Ident("person/favorite"), V: TempID("2")},
+			},
+		}
+		assert.Equal(t, expected, actual)
+	})
 }
