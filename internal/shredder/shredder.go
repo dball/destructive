@@ -52,32 +52,29 @@ func (s *shredder) Shred(doc Document) (req Request, err error) {
 		tempIDs:  make(map[TempID]map[IDRef]Void, total),
 		pointers: make(map[reflect.Value]TempID, total),
 	}
-	req.TempIDs = make(map[TempID]map[IDRef]Void, total)
 	// The likely size here is actually assertions*numFields + retractions
 	req.Claims = make([]*Claim, 0, total)
-	pointers := make(map[reflect.Value]TempID, total)
 	for _, x := range doc.Retractions {
-		err = s.retract(&req, pointers, x)
-		if err != nil {
-			return
-		}
-	}
-	for _, x := range doc.Assertions {
 		var claims []*Claim
-		_, claims, err = s.assert2(&confetti, x)
+		_, claims, err = s.retract(&confetti, x)
 		if err != nil {
 			return
 		}
 		req.Claims = append(req.Claims, claims...)
 	}
-	// TODO just until we fix retractions
-	if len(req.TempIDs) == 0 {
-		req.TempIDs = confetti.tempIDs
+	for _, x := range doc.Assertions {
+		var claims []*Claim
+		_, claims, err = s.assert(&confetti, x)
+		if err != nil {
+			return
+		}
+		req.Claims = append(req.Claims, claims...)
 	}
+	req.TempIDs = confetti.tempIDs
 	return
 }
 
-func (s *shredder) assert2(confetti *confetti, x any) (e TempID, claims []*Claim, err error) {
+func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim, err error) {
 	var tempidConstraints map[IDRef]Void
 	typ := reflect.TypeOf(x)
 	var fields reflect.Value
@@ -157,7 +154,7 @@ func (s *shredder) assert2(confetti *confetti, x any) (e TempID, claims []*Claim
 			// TODO idk if tempid constraints are legit or not
 		default:
 			var refFieldClaims []*Claim
-			vref, refFieldClaims, err = s.assert2(confetti, v)
+			vref, refFieldClaims, err = s.assert(confetti, v)
 			if err != nil {
 				return
 			}
@@ -169,68 +166,7 @@ func (s *shredder) assert2(confetti *confetti, x any) (e TempID, claims []*Claim
 	return
 }
 
-func (s *shredder) retract(req *Request, pointers map[reflect.Value]TempID, x any) (err error) {
-	e := s.nextTempID()
-	req.Claims = append(req.Claims, &Claim{E: e, Retract: true})
-	tempidConstraints := map[IDRef]Void{}
-	req.TempIDs[e] = tempidConstraints
-	typ := reflect.TypeOf(x)
-	if typ.Kind() != reflect.Struct {
-		err = NewError("shredder.invalidStruct", "type", typ)
-		return
-	}
-	n := typ.NumField()
-	for i := 0; i < n; i++ {
-		fieldType := typ.Field(i)
-		attr, attrErr := parseAttrField(fieldType)
-		if attrErr != nil {
-			err = attrErr
-			return
-		}
-		if attr.ident == "" {
-			continue
-		}
-		fieldValue := reflect.ValueOf(x).Field(i)
-		if attr.ident == sys.DbId {
-			switch fieldType.Type.Kind() {
-			case reflect.Uint:
-				if fieldValue.IsZero() {
-					continue
-				}
-				tempidConstraints[ID(fieldValue.Uint())] = Void{}
-			default:
-				err = NewError("shredder.invalidIdFieldType", "type", fieldType)
-				return
-			}
-			continue
-		}
-		if attr.unique == 0 {
-			continue
-		}
-		vref, fieldErr := getFieldValue(pointers, fieldType, fieldValue)
-		if fieldErr != nil {
-			err = fieldErr
-			return
-		}
-		if vref == nil {
-			continue
-		}
-		v, ok := vref.(Value)
-		if !ok {
-			continue
-		}
-		if attr.ignoreEmpty && v.IsEmpty() {
-			continue
-		}
-		tempidConstraints[LookupRef{A: attr.ident, V: v}] = Void{}
-	}
-	if len(tempidConstraints) == 0 {
-		err = NewError("shredder.unidentifiedRetract")
-	}
-	return
-}
-
-func (s *shredder) retract2(confetti *confetti, x any) (e TempID, claims []*Claim, err error) {
+func (s *shredder) retract(confetti *confetti, x any) (e TempID, claims []*Claim, err error) {
 	var tempidConstraints map[IDRef]Void
 	var fields reflect.Value
 	typ := reflect.TypeOf(x)
