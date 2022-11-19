@@ -30,6 +30,16 @@ func NewShredder() Shredder {
 	return &shredder{nextID: uint64(1)}
 }
 
+// confetti are the (internal) results of shredding a document. Note that confetti may
+// be inconsistent or invalid.
+type confetti struct {
+	// pointers associate pointers to shredded structs with their tempids in the request
+	pointers map[reflect.Value]TempID
+	// tempIDs are the registry of temp ids allocated by shredding the document, along with the
+	// set of constraints on those tempids.
+	tempIDs map[TempID]map[IDRef]Void
+}
+
 func (s *shredder) nextTempID() TempID {
 	id := s.nextID
 	s.nextID++
@@ -38,6 +48,10 @@ func (s *shredder) nextTempID() TempID {
 
 func (s *shredder) Shred(doc Document) (req Request, err error) {
 	total := len(doc.Assertions) + len(doc.Retractions)
+	confetti := confetti{
+		tempIDs:  make(map[TempID]map[IDRef]Void, total),
+		pointers: make(map[reflect.Value]TempID, total),
+	}
 	req.TempIDs = make(map[TempID]map[IDRef]Void, total)
 	// The likely size here is actually assertions*numFields + retractions
 	req.Claims = make([]*Claim, 0, total)
@@ -49,15 +63,21 @@ func (s *shredder) Shred(doc Document) (req Request, err error) {
 		}
 	}
 	for _, x := range doc.Assertions {
-		_, err = s.assert(&req, pointers, x)
+		var claims []*Claim
+		_, claims, err = s.assert2(&confetti, x)
 		if err != nil {
 			return
 		}
+		req.Claims = append(req.Claims, claims...)
+	}
+	// TODO just until we fix retractions
+	if len(req.TempIDs) == 0 {
+		req.TempIDs = confetti.tempIDs
 	}
 	return
 }
 
-func (s *shredder) assert(req *Request, pointers map[reflect.Value]TempID, x any) (e TempID, err error) {
+func (s *shredder) assert2(confetti *confetti, x any) (e TempID, claims []*Claim, err error) {
 	var tempidConstraints map[IDRef]Void
 	typ := reflect.TypeOf(x)
 	var fields reflect.Value
@@ -66,21 +86,21 @@ func (s *shredder) assert(req *Request, pointers map[reflect.Value]TempID, x any
 		fields = reflect.ValueOf(x)
 		e = s.nextTempID()
 		tempidConstraints = map[IDRef]Void{}
-		req.TempIDs[e] = tempidConstraints
+		confetti.tempIDs[e] = tempidConstraints
 	case reflect.Pointer:
 		ptr := reflect.ValueOf(x)
 		if ptr.IsNil() {
 			err = NewError("shredder.nilStruct")
 			return
 		}
-		_, ok := pointers[ptr]
+		_, ok := confetti.pointers[ptr]
 		if ok {
 			return
 		}
 		e = s.nextTempID()
 		tempidConstraints = map[IDRef]Void{}
-		req.TempIDs[e] = tempidConstraints
-		pointers[ptr] = e
+		confetti.tempIDs[e] = tempidConstraints
+		confetti.pointers[ptr] = e
 		fields = ptr.Elem()
 		typ = fields.Type()
 	default:
@@ -88,6 +108,8 @@ func (s *shredder) assert(req *Request, pointers map[reflect.Value]TempID, x any
 		return
 	}
 	n := typ.NumField()
+	claims = make([]*Claim, 0, n)
+	var refFieldsClaims []*Claim
 	for i := 0; i < n; i++ {
 		fieldType := typ.Field(i)
 		attr, attrErr := parseAttrField(fieldType)
@@ -112,7 +134,7 @@ func (s *shredder) assert(req *Request, pointers map[reflect.Value]TempID, x any
 			}
 			continue
 		}
-		val, fieldErr := getFieldValue(pointers, fieldType, fieldValue)
+		val, fieldErr := getFieldValue(confetti.pointers, fieldType, fieldValue)
 		if fieldErr != nil {
 			err = fieldErr
 			return
@@ -134,15 +156,16 @@ func (s *shredder) assert(req *Request, pointers map[reflect.Value]TempID, x any
 			vref = v
 			// TODO idk if tempid constraints are legit or not
 		default:
-			// TODO we'll have better insert performance if we defer appending these claims until this
-			// entity is finished. Easier to write tests as well.
-			vref, err = s.assert(req, pointers, v)
+			var refFieldClaims []*Claim
+			vref, refFieldClaims, err = s.assert2(confetti, v)
 			if err != nil {
 				return
 			}
+			refFieldsClaims = append(refFieldsClaims, refFieldClaims...)
 		}
-		req.Claims = append(req.Claims, &Claim{E: e, A: attr.ident, V: vref})
+		claims = append(claims, &Claim{E: e, A: attr.ident, V: vref})
 	}
+	claims = append(claims, refFieldsClaims...)
 	return
 }
 
@@ -202,6 +225,89 @@ func (s *shredder) retract(req *Request, pointers map[reflect.Value]TempID, x an
 		tempidConstraints[LookupRef{A: attr.ident, V: v}] = Void{}
 	}
 	if len(tempidConstraints) == 0 {
+		err = NewError("shredder.unidentifiedRetract")
+	}
+	return
+}
+
+func (s *shredder) retract2(confetti *confetti, x any) (e TempID, claims []*Claim, err error) {
+	var tempidConstraints map[IDRef]Void
+	var fields reflect.Value
+	typ := reflect.TypeOf(x)
+	switch typ.Kind() {
+	case reflect.Struct:
+		fields = reflect.ValueOf(x)
+		e = s.nextTempID()
+		tempidConstraints = map[IDRef]Void{}
+		confetti.tempIDs[e] = tempidConstraints
+	case reflect.Pointer:
+		ptr := reflect.ValueOf(x)
+		if ptr.IsNil() {
+			err = NewError("shredder.nilStruct")
+			return
+		}
+		_, ok := confetti.pointers[ptr]
+		if ok {
+			return
+		}
+		e = s.nextTempID()
+		tempidConstraints = map[IDRef]Void{}
+		confetti.tempIDs[e] = tempidConstraints
+		confetti.pointers[ptr] = e
+		fields = ptr.Elem()
+		typ = fields.Type()
+	default:
+		err = NewError("shredder.invalidStruct", "type", typ)
+		return
+	}
+	n := typ.NumField()
+	claims = []*Claim{{E: e, Retract: true}}
+	for i := 0; i < n; i++ {
+		fieldType := typ.Field(i)
+		attr, attrErr := parseAttrField(fieldType)
+		if attrErr != nil {
+			err = attrErr
+			return
+		}
+		if attr.ident == "" {
+			continue
+		}
+		fieldValue := fields.Field(i)
+		if attr.ident == sys.DbId {
+			switch fieldType.Type.Kind() {
+			case reflect.Uint:
+				if fieldValue.IsZero() {
+					continue
+				}
+				tempidConstraints[ID(fieldValue.Uint())] = Void{}
+			default:
+				err = NewError("shredder.invalidIdFieldType", "type", fieldType)
+				return
+			}
+			continue
+		}
+		if attr.unique == 0 {
+			continue
+		}
+		vref, fieldErr := getFieldValue(confetti.pointers, fieldType, fieldValue)
+		if fieldErr != nil {
+			err = fieldErr
+			return
+		}
+		if vref == nil {
+			continue
+		}
+		v, ok := vref.(Value)
+		if !ok {
+			continue
+		}
+		if attr.ignoreEmpty && v.IsEmpty() {
+			continue
+		}
+		tempidConstraints[LookupRef{A: attr.ident, V: v}] = Void{}
+	}
+	if len(tempidConstraints) == 0 {
+		// TODO maybe this defers to the transaction or a dedicated pure claims validation pass
 		err = NewError("shredder.unidentifiedRetract")
 	}
 	return
