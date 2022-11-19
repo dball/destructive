@@ -250,3 +250,55 @@ func TestScalarSliceFields(t *testing.T) {
 		assert.Equal(t, expected, actual)
 	})
 }
+
+func TestStructSliceFields(t *testing.T) {
+	// Note this will produce datums equivalent to the scalar example above, the only difference being
+	// that the Run structs have room to record/represent other data.
+
+	type Run struct {
+		Score float64 `attr:"test/score"`
+	}
+
+	type Test struct {
+		Title string `attr:"test/title"`
+		Runs  []Run  `attr:"test/scores"`
+	}
+
+	t.Run("assert", func(t *testing.T) {
+		shredder := NewShredder()
+		test := Test{
+			Title: "Algebra II",
+			Runs: []Run{
+				{Score: 95.3},
+				{Score: 92.0},
+				{Score: 98.9},
+			},
+		}
+		actual, err := shredder.Shred(Document{Assertions: []any{test}})
+		assert.NoError(t, err)
+		// TODO the thing we may need to add here is a retraction for the slice ref attr values.
+		// Either that, or a txn fn that compares ordered list values and computes the minimal
+		// set of datum changes to transform one into the other.
+		expected := Request{
+			Claims: []*Claim{
+				{E: TempID("1"), A: Ident("test/title"), V: String("Algebra II")},
+				{E: TempID("1"), A: Ident("test/scores"), V: TempID("2")},
+				{E: TempID("1"), A: Ident("test/scores"), V: TempID("3")},
+				{E: TempID("1"), A: Ident("test/scores"), V: TempID("4")},
+				{E: TempID("2"), A: Ident("sys/db/rank"), V: Int(0)},
+				{E: TempID("2"), A: Ident("test/score"), V: Float(95.3)},
+				{E: TempID("3"), A: Ident("sys/db/rank"), V: Int(1)},
+				{E: TempID("3"), A: Ident("test/score"), V: Float(92.0)},
+				{E: TempID("4"), A: Ident("sys/db/rank"), V: Int(2)},
+				{E: TempID("4"), A: Ident("test/score"), V: Float(98.9)},
+			},
+			TempIDs: map[TempID]map[IDRef]Void{
+				TempID("1"): {},
+				TempID("2"): {},
+				TempID("3"): {},
+				TempID("4"): {},
+			},
+		}
+		assert.Equal(t, expected, actual)
+	})
+}
