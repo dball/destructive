@@ -212,7 +212,7 @@ func TestMapFields(t *testing.T) {
 func TestScalarSliceFields(t *testing.T) {
 	type Test struct {
 		title  string    `attr:"test/title"`
-		scores []float64 `attr:"test/scores,scalar=test/score"`
+		scores []float64 `attr:"test/scores,value=test/score"`
 	}
 
 	t.Run("assert", func(t *testing.T) {

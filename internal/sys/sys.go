@@ -27,6 +27,7 @@ const (
 	AttrTypeFloat        = ID(16)
 	AttrRefType          = ID(17)
 	AttrRefTypeDependent = ID(18)
+	DbRank               = ID(19)
 	FirstUserID          = ID(0x100000)
 )
 
@@ -57,10 +58,12 @@ var Datums []Datum = []Datum{
 	{E: AttrRefType, A: DbIdent, V: String("sys/attr/ref/type"), T: Tx},
 	{E: AttrRefType, A: AttrType, V: AttrTypeRef, T: Tx},
 	{E: AttrRefTypeDependent, A: DbIdent, V: String("sys/attr/ref/type/dependent"), T: Tx},
+	{E: DbRank, A: DbIdent, V: String("sys/db/rank"), T: Tx},
+	{E: DbRank, A: AttrType, V: AttrTypeInt, T: Tx},
 	{E: Tx, A: TxAt, V: Inst(epoch), T: Tx},
 }
 
-// This could be computed from Datums but this is smaller than the reducer code
+// Attrs could be computed from Datums but this is smaller than the reducer code.
 var Attrs map[ID]Attr = map[ID]Attr{
 	DbIdent:         {ID: DbIdent, Type: AttrTypeString, Unique: AttrUniqueIdentity, Ident: Ident("sys/db/ident")},
 	AttrUnique:      {ID: AttrUnique, Type: AttrTypeRef, Ident: Ident("sys/attr/unique")},
@@ -68,6 +71,7 @@ var Attrs map[ID]Attr = map[ID]Attr{
 	AttrCardinality: {ID: AttrCardinality, Type: AttrTypeRef, Ident: Ident("sys/attr/cardinality")},
 	AttrRefType:     {ID: AttrRefType, Type: AttrTypeRef, Ident: Ident("sys/attr/ref/type")},
 	TxAt:            {ID: TxAt, Type: AttrTypeInst, Ident: Ident("sys/tx/at")},
+	DbRank:          {ID: DbRank, Type: AttrTypeInt, Ident: Ident("sys/db/rank")},
 }
 
 func ValidValue(typ ID, value Value) (ok bool) {
