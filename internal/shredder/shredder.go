@@ -173,7 +173,16 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim,
 					if err != nil {
 						return
 					}
-					refFieldsClaims = append(refFieldsClaims, refFieldClaims...)
+					switch {
+					case attr.mapKey != "":
+						refFieldsClaims = append(refFieldsClaims, refFieldClaims...)
+					case len(refFieldClaims) > 0:
+						refFieldsClaims = append(refFieldsClaims, &Claim{E: refFieldClaims[0].E, A: Ident("sys/db/rank"), V: Int(i)})
+						refFieldsClaims = append(refFieldsClaims, refFieldClaims...)
+					default:
+						err = NewError("shredder.missingSliceCollectionValue")
+						return
+					}
 					claims = append(claims, &Claim{E: e, A: attr.ident, V: vref})
 				}
 			}

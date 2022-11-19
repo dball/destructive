@@ -189,6 +189,8 @@ func TestMapFields(t *testing.T) {
 		}}
 		actual, err := shredder.Shred(Document{Assertions: []any{me}})
 		assert.NoError(t, err)
+		// TODO we can't actually guarantee the tempids for our two books since maps have unspecified iteration order
+		// perhaps we need special test expect matcher for requests...
 		expected := Request{
 			Claims: []*Claim{
 				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
