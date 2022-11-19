@@ -218,7 +218,8 @@ func TestScalarSliceFields(t *testing.T) {
 	t.Run("assert", func(t *testing.T) {
 		shredder := NewShredder()
 		test := Test{
-			title:  "Algebra II",
+			title: "Algebra II",
+			// we're pretending order is important here, e.g. tests repeatedly taken over time
 			scores: []float64{95.3, 92.0, 98.9},
 		}
 		actual, err := shredder.Shred(Document{Assertions: []any{test}})
