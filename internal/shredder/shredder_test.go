@@ -169,3 +169,42 @@ func TestStructs(t *testing.T) {
 		assert.Equal(t, expected, actual)
 	})
 }
+
+func TestMapFields(t *testing.T) {
+	type Book struct {
+		Title  string `attr:"book/title"`
+		Author string `attr:"book/author"`
+	}
+
+	type Person struct {
+		Name          string          `attr:"person/name,unique"`
+		FavoriteBooks map[string]Book `attr:"person/favorite-books,key=book/title"`
+	}
+
+	t.Run("assert", func(t *testing.T) {
+		shredder := NewShredder()
+		me := Person{Name: "Donald", FavoriteBooks: map[string]Book{
+			"Immortality":          {Title: "Immortality", Author: "Milan Kundera"},
+			"Parable of the Sower": {Title: "Parable of the Sower", Author: "Octavia Butler"},
+		}}
+		actual, err := shredder.Shred(Document{Assertions: []any{me}})
+		assert.NoError(t, err)
+		expected := Request{
+			Claims: []*Claim{
+				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
+				{E: TempID("1"), A: Ident("person/favorite-books"), V: TempID("2")},
+				{E: TempID("1"), A: Ident("person/favorite-books"), V: TempID("3")},
+				{E: TempID("2"), A: Ident("book/title"), V: String("Immortality")},
+				{E: TempID("2"), A: Ident("book/author"), V: String("Milan Kundera")},
+				{E: TempID("3"), A: Ident("book/title"), V: String("Parable of the Sower")},
+				{E: TempID("3"), A: Ident("book/author"), V: String("Octavia Butler")},
+			},
+			TempIDs: map[TempID]map[IDRef]Void{
+				TempID("1"): {},
+				TempID("2"): {},
+				TempID("3"): {},
+			},
+		}
+		assert.Equal(t, expected, actual)
+	})
+}
