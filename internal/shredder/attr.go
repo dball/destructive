@@ -17,6 +17,7 @@ type attrTag struct {
 	ignoreEmpty bool
 	pointer     bool
 	mapKey      Ident
+	collValue   Ident
 }
 
 func parseAttrTag(tag string) (attr attrTag, err error) {
@@ -41,9 +42,12 @@ func parseAttrTag(tag string) (attr attrTag, err error) {
 		case "ignoreempty":
 			attr.ignoreEmpty = true
 		default:
-			if strings.HasPrefix(part, "key=") {
+			switch {
+			case strings.HasPrefix(part, "key="):
 				attr.mapKey = Ident(part[4:])
-			} else {
+			case strings.HasPrefix(part, "value="):
+				attr.collValue = Ident(part[6:])
+			default:
 				err = NewError("shredder.invalidDirective", "tag", tag)
 				return
 			}
@@ -88,6 +92,8 @@ func parseAttrField(field reflect.StructField) (attr attrTag, err error) {
 		if attr.mapKey == "" {
 			attr.mapKey = Ident(sys.DbId)
 		}
+	case reflect.Slice:
+		attr.typ = sys.AttrRefType
 	case reflect.Pointer:
 		attr.pointer = true
 		// This repeats the outer switch, but without the pointer case.

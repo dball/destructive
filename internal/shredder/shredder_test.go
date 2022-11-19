@@ -211,19 +211,22 @@ func TestMapFields(t *testing.T) {
 
 func TestScalarSliceFields(t *testing.T) {
 	type Test struct {
-		title  string    `attr:"test/title"`
-		scores []float64 `attr:"test/scores,value=test/score"`
+		Title  string    `attr:"test/title"`
+		Scores []float64 `attr:"test/scores,value=test/score"`
 	}
 
 	t.Run("assert", func(t *testing.T) {
 		shredder := NewShredder()
 		test := Test{
-			title: "Algebra II",
+			Title: "Algebra II",
 			// we're pretending order is important here, e.g. tests repeatedly taken over time
-			scores: []float64{95.3, 92.0, 98.9},
+			Scores: []float64{95.3, 92.0, 98.9},
 		}
 		actual, err := shredder.Shred(Document{Assertions: []any{test}})
 		assert.NoError(t, err)
+		// TODO the thing we may need to add here is a retraction for the slice ref attr values.
+		// Either that, or a txn fn that compares ordered list values and computes the minimal
+		// set of datum changes to transform one into the other.
 		expected := Request{
 			Claims: []*Claim{
 				{E: TempID("1"), A: Ident("test/title"), V: String("Algebra II")},

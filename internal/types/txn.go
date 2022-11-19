@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 // TempID is a value that will resolve to a system id when a claim is asserted.
 type TempID string
 
@@ -31,6 +33,42 @@ func (Inst) IsVRef()      {}
 func (Float) IsVRef()     {}
 func (TempID) IsVRef()    {}
 func (LookupRef) IsVRef() {}
+
+func ToVRef(x any) (v VRef, ok bool) {
+	ok = true
+	switch xv := x.(type) {
+	case ID:
+		v = xv
+	case String:
+		v = xv
+	case Int:
+		v = xv
+	case Bool:
+		v = xv
+	case Inst:
+		v = xv
+	case Float:
+		v = xv
+	case TempID:
+		v = xv
+	case LookupRef:
+		v = xv
+	case uint64:
+		// TODO idk if I like this blanket policy tbh
+		v = ID(xv)
+	case string:
+		v = String(xv)
+	case int64:
+		v = Int(xv)
+	case time.Time:
+		v = Inst(xv)
+	case float64:
+		v = Float(xv)
+	default:
+		ok = false
+	}
+	return
+}
 
 // Claim is an assertion of or retraction of a datum, or all datums for an entity.
 type Claim struct {

@@ -39,6 +39,13 @@ func getFieldValue(pointers map[reflect.Value]TempID, fieldType reflect.StructFi
 			vals = append(vals, iter.Value().Interface())
 		}
 		val = vals
+	case reflect.Slice:
+		var vals values
+		n := fieldValue.Len()
+		for i := 0; i < n; i++ {
+			vals = append(vals, fieldValue.Index(i).Interface())
+		}
+		val = vals
 	case reflect.Pointer:
 		if !fieldValue.IsNil() {
 			switch fieldType.Type.Elem().Kind() {
