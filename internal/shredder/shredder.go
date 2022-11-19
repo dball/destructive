@@ -152,6 +152,18 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim,
 		case TempID:
 			vref = v
 			// TODO idk if tempid constraints are legit or not
+		case values:
+			// TODO sucks that we're special casing this slice, revisit after we add scalar slice fields
+			for _, vv := range v {
+				var refFieldClaims []*Claim
+				vref, refFieldClaims, err = s.assert(confetti, vv)
+				if err != nil {
+					return
+				}
+				refFieldsClaims = append(refFieldsClaims, refFieldClaims...)
+				claims = append(claims, &Claim{E: e, A: attr.ident, V: vref})
+			}
+			continue
 		default:
 			var refFieldClaims []*Claim
 			vref, refFieldClaims, err = s.assert(confetti, v)

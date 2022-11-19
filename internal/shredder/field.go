@@ -7,6 +7,8 @@ import (
 	. "github.com/dball/destructive/internal/types"
 )
 
+type values []any
+
 func getFieldValue(pointers map[reflect.Value]TempID, fieldType reflect.StructField, fieldValue reflect.Value) (val any, err error) {
 	switch fieldType.Type.Kind() {
 	case reflect.Bool:
@@ -25,6 +27,18 @@ func getFieldValue(pointers map[reflect.Value]TempID, fieldType reflect.StructFi
 		}
 	case reflect.Float64:
 		val = Float(fieldValue.Float())
+	case reflect.Map:
+		var vals values
+		iter := fieldValue.MapRange()
+		for iter.Next() {
+			// TODO we're ignoring the key value on the assumptions that
+			// a. the values are structs
+			// b. the field appears therein
+			// c. the key and struct field value agree
+			// these may not obtain, revisit after we add more cardinality many field values
+			vals = append(vals, iter.Value().Interface())
+		}
+		val = vals
 	case reflect.Pointer:
 		if !fieldValue.IsNil() {
 			switch fieldType.Type.Elem().Kind() {

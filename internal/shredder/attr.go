@@ -16,6 +16,7 @@ type attrTag struct {
 	typ         ID
 	ignoreEmpty bool
 	pointer     bool
+	mapKey      Ident
 }
 
 func parseAttrTag(tag string) (attr attrTag, err error) {
@@ -23,7 +24,8 @@ func parseAttrTag(tag string) (attr attrTag, err error) {
 	attr.ident = Ident(parts[0])
 	n := len(parts)
 	for i := 1; i < n; i++ {
-		switch parts[i] {
+		part := parts[i]
+		switch part {
 		case "identity":
 			if attr.unique != 0 {
 				err = NewError("shredder.duplicateUniqueDirective", "tag", tag)
@@ -39,8 +41,12 @@ func parseAttrTag(tag string) (attr attrTag, err error) {
 		case "ignoreempty":
 			attr.ignoreEmpty = true
 		default:
-			err = NewError("shredder.invalidDirective", "tag", tag)
-			return
+			if strings.HasPrefix(part, "key=") {
+				attr.mapKey = Ident(part[4:])
+			} else {
+				err = NewError("shredder.invalidDirective", "tag", tag)
+				return
+			}
 		}
 	}
 	return
@@ -77,6 +83,11 @@ func parseAttrField(field reflect.StructField) (attr attrTag, err error) {
 		} else {
 			attr.typ = sys.AttrTypeRef
 		}
+	case reflect.Map:
+		attr.typ = sys.AttrRefType
+		if attr.mapKey == "" {
+			attr.mapKey = Ident(sys.DbId)
+		}
 	case reflect.Pointer:
 		attr.pointer = true
 		// This repeats the outer switch, but without the pointer case.
@@ -95,6 +106,8 @@ func parseAttrField(field reflect.StructField) (attr attrTag, err error) {
 			} else {
 				attr.typ = sys.AttrTypeRef
 			}
+		default:
+			err = NewError("shredder.invalidPointerType", "tag", tag, "type", field.Type, "kind", field.Type.Elem().Kind())
 		}
 	default:
 		err = NewError("shredder.invalidType", "tag", tag, "type", field.Type, "kind", field.Type.Kind())

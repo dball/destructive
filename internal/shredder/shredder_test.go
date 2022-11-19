@@ -200,7 +200,7 @@ func TestMapFields(t *testing.T) {
 				{E: TempID("3"), A: Ident("book/author"), V: String("Octavia Butler")},
 			},
 			TempIDs: map[TempID]map[IDRef]Void{
-				TempID("1"): {},
+				TempID("1"): {LookupRef{A: Ident("person/name"), V: String("Donald")}: Void{}},
 				TempID("2"): {},
 				TempID("3"): {},
 			},
