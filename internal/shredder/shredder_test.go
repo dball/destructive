@@ -189,9 +189,8 @@ func TestMapFields(t *testing.T) {
 		}}
 		actual, err := shredder.Shred(Document{Assertions: []any{me}})
 		assert.NoError(t, err)
-		// TODO we can't actually guarantee the tempids for our two books since maps have unspecified iteration order
-		// perhaps we need special test expect matcher for requests...
-		expected := Request{
+		// The order of map entries is not specified, so we must allow both permutations.
+		expected1 := Request{
 			Claims: []*Claim{
 				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 				{E: TempID("1"), A: Ident("person/favorite-books"), V: TempID("2")},
@@ -207,7 +206,30 @@ func TestMapFields(t *testing.T) {
 				TempID("3"): {},
 			},
 		}
-		assert.Equal(t, expected, actual)
+		expected2 := Request{
+			Claims: []*Claim{
+				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
+				{E: TempID("1"), A: Ident("person/favorite-books"), V: TempID("2")},
+				{E: TempID("1"), A: Ident("person/favorite-books"), V: TempID("3")},
+				{E: TempID("2"), A: Ident("book/title"), V: String("Parable of the Sower")},
+				{E: TempID("2"), A: Ident("book/author"), V: String("Octavia Butler")},
+				{E: TempID("3"), A: Ident("book/title"), V: String("Immortality")},
+				{E: TempID("3"), A: Ident("book/author"), V: String("Milan Kundera")},
+			},
+			TempIDs: map[TempID]map[IDRef]Void{
+				TempID("1"): {LookupRef{A: Ident("person/name"), V: String("Donald")}: Void{}},
+				TempID("2"): {},
+				TempID("3"): {},
+			},
+		}
+		switch {
+		case assert.ObjectsAreEqual(expected1, actual):
+			assert.Equal(t, expected1, actual)
+		case assert.ObjectsAreEqual(expected2, actual):
+			assert.Equal(t, expected2, actual)
+		default:
+			assert.Equal(t, expected1, actual)
+		}
 	})
 }
 
