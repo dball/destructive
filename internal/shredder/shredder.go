@@ -109,16 +109,16 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim,
 	var refFieldsClaims []*Claim
 	for i := 0; i < n; i++ {
 		fieldType := typ.Field(i)
-		attr, attrErr := parseAttrField(fieldType)
+		attr, attrErr := ParseAttrField(fieldType)
 		if attrErr != nil {
 			err = attrErr
 			return
 		}
-		if attr.ident == "" {
+		if attr.Ident == "" {
 			continue
 		}
 		fieldValue := fields.Field(i)
-		if attr.ident == sys.DbId {
+		if attr.Ident == sys.DbId {
 			switch fieldType.Type.Kind() {
 			case reflect.Uint:
 				if fieldValue.IsZero() {
@@ -143,11 +143,11 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim,
 		switch v := val.(type) {
 		case Value:
 			vref = v.(VRef)
-			if attr.ignoreEmpty && v.IsEmpty() {
+			if attr.IgnoreEmpty && v.IsEmpty() {
 				continue
 			}
-			if attr.unique != 0 {
-				tempidConstraints[LookupRef{A: attr.ident, V: v}] = Void{}
+			if attr.Unique != 0 {
+				tempidConstraints[LookupRef{A: attr.Ident, V: v}] = Void{}
 			}
 		case TempID:
 			vref = v
@@ -155,7 +155,7 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim,
 		case values:
 			for i, vv := range v {
 				var refFieldClaims []*Claim
-				if attr.collValue != "" {
+				if attr.CollValue != "" {
 					vvv, ok := ToVRef(vv)
 					if !ok {
 						err = NewError("shredder.invalidSliceValue")
@@ -165,16 +165,16 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim,
 					confetti.tempIDs[ve] = map[IDRef]Void{}
 					refFieldsClaims = append(refFieldsClaims,
 						&Claim{E: ve, A: Ident("sys/db/rank"), V: Int(i)},
-						&Claim{E: ve, A: attr.collValue, V: vvv},
+						&Claim{E: ve, A: attr.CollValue, V: vvv},
 					)
-					claims = append(claims, &Claim{E: e, A: attr.ident, V: ve})
+					claims = append(claims, &Claim{E: e, A: attr.Ident, V: ve})
 				} else {
 					vref, refFieldClaims, err = s.assert(confetti, vv)
 					if err != nil {
 						return
 					}
 					switch {
-					case attr.mapKey != "":
+					case attr.MapKey != "":
 						refFieldsClaims = append(refFieldsClaims, refFieldClaims...)
 					case len(refFieldClaims) > 0:
 						refFieldsClaims = append(refFieldsClaims, &Claim{E: refFieldClaims[0].E, A: Ident("sys/db/rank"), V: Int(i)})
@@ -183,7 +183,7 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim,
 						err = NewError("shredder.missingSliceCollectionValue")
 						return
 					}
-					claims = append(claims, &Claim{E: e, A: attr.ident, V: vref})
+					claims = append(claims, &Claim{E: e, A: attr.Ident, V: vref})
 				}
 			}
 			continue
@@ -195,7 +195,7 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim,
 			}
 			refFieldsClaims = append(refFieldsClaims, refFieldClaims...)
 		}
-		claims = append(claims, &Claim{E: e, A: attr.ident, V: vref})
+		claims = append(claims, &Claim{E: e, A: attr.Ident, V: vref})
 	}
 	claims = append(claims, refFieldsClaims...)
 	return
@@ -235,16 +235,16 @@ func (s *shredder) retract(confetti *confetti, x any) (e TempID, claims []*Claim
 	claims = []*Claim{{E: e, Retract: true}}
 	for i := 0; i < n; i++ {
 		fieldType := typ.Field(i)
-		attr, attrErr := parseAttrField(fieldType)
+		attr, attrErr := ParseAttrField(fieldType)
 		if attrErr != nil {
 			err = attrErr
 			return
 		}
-		if attr.ident == "" {
+		if attr.Ident == "" {
 			continue
 		}
 		fieldValue := fields.Field(i)
-		if attr.ident == sys.DbId {
+		if attr.Ident == sys.DbId {
 			switch fieldType.Type.Kind() {
 			case reflect.Uint:
 				if fieldValue.IsZero() {
@@ -257,7 +257,7 @@ func (s *shredder) retract(confetti *confetti, x any) (e TempID, claims []*Claim
 			}
 			continue
 		}
-		if attr.unique == 0 {
+		if attr.Unique == 0 {
 			continue
 		}
 		vref, fieldErr := getFieldValue(confetti.pointers, fieldType, fieldValue)
@@ -272,10 +272,10 @@ func (s *shredder) retract(confetti *confetti, x any) (e TempID, claims []*Claim
 		if !ok {
 			continue
 		}
-		if attr.ignoreEmpty && v.IsEmpty() {
+		if attr.IgnoreEmpty && v.IsEmpty() {
 			continue
 		}
-		tempidConstraints[LookupRef{A: attr.ident, V: v}] = Void{}
+		tempidConstraints[LookupRef{A: attr.Ident, V: v}] = Void{}
 	}
 	if len(tempidConstraints) == 0 {
 		// TODO maybe this defers to the transaction or a dedicated pure claims validation pass

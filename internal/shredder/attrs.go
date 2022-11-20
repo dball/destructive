@@ -8,45 +8,45 @@ import (
 	. "github.com/dball/destructive/internal/types"
 )
 
-// attrTags is a partial representation of an attr and hints on how
+// AttrTag is a partial representation of an attr and hints on how
 // how it is realized on a struct field
-type attrTag struct {
-	ident       Ident
-	unique      ID
-	typ         ID
-	ignoreEmpty bool
-	pointer     bool
-	mapKey      Ident
-	collValue   Ident
+type AttrTag struct {
+	Ident       Ident
+	Unique      ID
+	Type        ID
+	IgnoreEmpty bool
+	Pointer     bool
+	MapKey      Ident
+	CollValue   Ident
 }
 
-func parseAttrTag(tag string) (attr attrTag, err error) {
+func parseAttrTag(tag string) (attr AttrTag, err error) {
 	parts := strings.Split(tag, ",")
-	attr.ident = Ident(parts[0])
+	attr.Ident = Ident(parts[0])
 	n := len(parts)
 	for i := 1; i < n; i++ {
 		part := parts[i]
 		switch part {
 		case "identity":
-			if attr.unique != 0 {
+			if attr.Unique != 0 {
 				err = NewError("shredder.duplicateUniqueDirective", "tag", tag)
 				return
 			}
-			attr.unique = sys.AttrUniqueIdentity
+			attr.Unique = sys.AttrUniqueIdentity
 		case "unique":
-			if attr.unique != 0 {
+			if attr.Unique != 0 {
 				err = NewError("shredder.duplicateUniqueDirective", "tag", tag)
 				return
 			}
-			attr.unique = sys.AttrUniqueValue
+			attr.Unique = sys.AttrUniqueValue
 		case "ignoreempty":
-			attr.ignoreEmpty = true
+			attr.IgnoreEmpty = true
 		default:
 			switch {
 			case strings.HasPrefix(part, "key="):
-				attr.mapKey = Ident(part[4:])
+				attr.MapKey = Ident(part[4:])
 			case strings.HasPrefix(part, "value="):
-				attr.collValue = Ident(part[6:])
+				attr.CollValue = Ident(part[6:])
 			default:
 				err = NewError("shredder.invalidDirective", "tag", tag)
 				return
@@ -56,11 +56,12 @@ func parseAttrTag(tag string) (attr attrTag, err error) {
 	return
 }
 
-// parseAttrField parses an attribute from the struct field. If the field
+// ParseAttrField parses an attribute from the struct field. If the field
 // does not define an attribute, it's ident will be empty.
 //
-// Note if the tag string needs to vary, we could define this on the shredder.
-func parseAttrField(field reflect.StructField) (attr attrTag, err error) {
+// Note if the tag string needs to vary, we could define this on the shredder
+// and give it as an arg.
+func ParseAttrField(field reflect.StructField) (attr AttrTag, err error) {
 	tag, ok := field.Tag.Lookup("attr")
 	if !ok {
 		return
@@ -69,48 +70,49 @@ func parseAttrField(field reflect.StructField) (attr attrTag, err error) {
 	if err != nil {
 		return
 	}
-	if attr.ident == sys.DbId {
+	if attr.Ident == sys.DbId {
 		return
 	}
 	switch field.Type.Kind() {
 	case reflect.Bool:
-		attr.typ = sys.AttrTypeBool
+		attr.Type = sys.AttrTypeBool
 	case reflect.Int:
-		attr.typ = sys.AttrTypeInt
+		attr.Type = sys.AttrTypeInt
 	case reflect.String:
-		attr.typ = sys.AttrTypeString
+		attr.Type = sys.AttrTypeString
 	case reflect.Float64:
-		attr.typ = sys.AttrTypeFloat
+		attr.Type = sys.AttrTypeFloat
 	case reflect.Struct:
 		if TimeType == field.Type {
-			attr.typ = sys.AttrTypeInst
+			attr.Type = sys.AttrTypeInst
 		} else {
-			attr.typ = sys.AttrTypeRef
+			attr.Type = sys.AttrTypeRef
 		}
 	case reflect.Map:
-		attr.typ = sys.AttrRefType
-		if attr.mapKey == "" {
-			attr.mapKey = Ident(sys.DbId)
+		attr.Type = sys.AttrRefType
+		if attr.MapKey == "" {
+			attr.MapKey = Ident(sys.DbId)
 		}
 	case reflect.Slice:
-		attr.typ = sys.AttrRefType
+		attr.Type = sys.AttrRefType
 	case reflect.Pointer:
-		attr.pointer = true
+		attr.Pointer = true
 		// This repeats the outer switch, but without the pointer case.
+		// TODO map, slice, right?
 		switch field.Type.Elem().Kind() {
 		case reflect.Bool:
-			attr.typ = sys.AttrTypeBool
+			attr.Type = sys.AttrTypeBool
 		case reflect.Int:
-			attr.typ = sys.AttrTypeInt
+			attr.Type = sys.AttrTypeInt
 		case reflect.String:
-			attr.typ = sys.AttrTypeString
+			attr.Type = sys.AttrTypeString
 		case reflect.Float64:
-			attr.typ = sys.AttrTypeFloat
+			attr.Type = sys.AttrTypeFloat
 		case reflect.Struct:
 			if TimeType == field.Type {
-				attr.typ = sys.AttrTypeInst
+				attr.Type = sys.AttrTypeInst
 			} else {
-				attr.typ = sys.AttrTypeRef
+				attr.Type = sys.AttrTypeRef
 			}
 		default:
 			err = NewError("shredder.invalidPointerType", "tag", tag, "type", field.Type, "kind", field.Type.Elem().Kind())
