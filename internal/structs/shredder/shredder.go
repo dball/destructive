@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strconv"
 
+	"github.com/dball/destructive/internal/structs/attrs"
 	"github.com/dball/destructive/internal/sys"
 	. "github.com/dball/destructive/internal/types"
 )
@@ -109,7 +110,7 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim,
 	var refFieldsClaims []*Claim
 	for i := 0; i < n; i++ {
 		fieldType := typ.Field(i)
-		attr, attrErr := ParseAttrField(fieldType)
+		attr, attrErr := attrs.ParseAttrField(fieldType)
 		if attrErr != nil {
 			err = attrErr
 			return
@@ -235,7 +236,7 @@ func (s *shredder) retract(confetti *confetti, x any) (e TempID, claims []*Claim
 	claims = []*Claim{{E: e, Retract: true}}
 	for i := 0; i < n; i++ {
 		fieldType := typ.Field(i)
-		attr, attrErr := ParseAttrField(fieldType)
+		attr, attrErr := attrs.ParseAttrField(fieldType)
 		if attrErr != nil {
 			err = attrErr
 			return

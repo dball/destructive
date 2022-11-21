@@ -1,4 +1,6 @@
-package shredder
+// Package attrs provides for parsing struct attr tags and the fields on which they're declared
+// to derive the datum attribute properties they require.
+package attrs
 
 import (
 	"reflect"
