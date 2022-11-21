@@ -68,12 +68,27 @@ func Assemble(target any, facts []Fact) (err error) {
 		// TODO here we're allowing the type of datum value drive the field type.
 		// Presumably, this should be controlled by the attrTag struct, which
 		// considers the field type.
-		switch v := fact.V.(type) {
-		case String:
-			field.SetString(string(v))
-		default:
-			err = NewError("assembler.invalidFactV")
-			return
+		if attrTag.Pointer {
+			// TODO who owns the vs anyway? If they're not copied at some point,
+			// exposing value pointers opens the door to database corruption.
+			switch v := fact.V.(type) {
+			case String:
+				// TODO does this count as a copy for the purpose of ensuring the
+				// outer pointer doesn't change the Fact value?
+				s := string(v)
+				field.Set(reflect.ValueOf(&s))
+			default:
+				err = NewError("assembler.invalidFactV")
+				return
+			}
+		} else {
+			switch v := fact.V.(type) {
+			case String:
+				field.SetString(string(v))
+			default:
+				err = NewError("assembler.invalidFactV")
+				return
+			}
 		}
 	}
 	return
