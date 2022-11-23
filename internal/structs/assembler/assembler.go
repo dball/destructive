@@ -3,12 +3,11 @@ package assembler
 
 import (
 	"reflect"
+	"sort"
 	"time"
 
 	"github.com/dball/destructive/internal/structs/attrs"
 	. "github.com/dball/destructive/internal/types"
-	"golang.org/x/exp/constraints"
-	"golang.org/x/exp/slices"
 )
 
 // Fact is a datum whose attribute has been resolved to an ident and has lost
@@ -27,16 +26,17 @@ type indexedAttrTag struct {
 	i int
 }
 
-// assembler assembles facts into entities.
 type assembler[T any] struct {
-	// pointers contains references to all entities allocated by this assembler.
-	pointers map[ID]any
-	// facts contains the facts not yet consumed, and must be sorted e-a-v.
-	facts []Fact
-	// base is a (nil) pointer to a struct of the type created for root entities.
+	// base is a (nil) pointer to a struct of the root entity type
 	base *T
-	// needed contains the sorted set of ids required to fully populate the assembled.
-	needed []ID
+	// facts are the facts for the assembly, sorted by e
+	facts []Fact
+	// instances are the fully realized root entity instances not yet returned
+	instances map[ID]*T
+	// pointers are pointers to all of the at least partially realized entities allocated by the assembler
+	pointers map[ID]reflect.Value
+	// unprocessed are (not nil) pointers to unrealized entities
+	unprocessed map[ID]reflect.Value
 }
 
 func NewAssembler[T any](base *T, facts []Fact) (a *assembler[T], err error) {
@@ -46,26 +46,51 @@ func NewAssembler[T any](base *T, facts []Fact) (a *assembler[T], err error) {
 		return
 	}
 	// TODO test that the pointer value type is a struct
-	a = &assembler[T]{pointers: map[ID]any{}, facts: facts, base: base, needed: []ID{}}
-	return
+	a = &assembler[T]{
+		base:        base,
+		facts:       facts,
+		instances:   map[ID]*T{},
+		pointers:    map[ID]reflect.Value{},
+		unprocessed: map[ID]reflect.Value{},
+	}
+	return a, err
 }
 
-// TODO the thing I think we want to do here is peek at the first datum's id, add
-// it to the needed set, perhaps with a populated pointer value, then call some
-// function to Process Everthing Needed, then return the pointer. Maybe also
-// populate a sorted set of pointers of the base type. Something like that.
-func (a *assembler[T]) Next() (entity *T, err error) {
-	// TODO return the next unreturned base entity if we found one via lookahead
-	if len(a.facts) == 0 {
-		return
-	}
-	// TODO wat seriously
-	pp := reflect.New(reflect.TypeOf(a.base))
+func (a *assembler[T]) allocate(id ID, pointerType reflect.Type) {
+	// allocate the new pointer
+	pp := reflect.New(pointerType)
 	ptr := pp.Elem()
-	pp.Elem().Set(reflect.New(ptr.Type().Elem()))
-	entity = pp.Elem().Interface().(*T)
+	// allocate the new struct
+	entity := reflect.New(ptr.Type().Elem())
+	// store the new struct in the new pointer
+	ptr.Set(entity)
+	// store the pointer in the unrealized entities map
+	a.unprocessed[id] = ptr
+	a.pointers[id] = ptr
+}
 
-	value := pp.Elem().Elem()
+func (a *assembler[T]) assembleAll() {
+	for {
+		if len(a.unprocessed) == 0 {
+			break
+		}
+		var id ID
+		var ptr reflect.Value
+		// TODO this should ideally be the first value in id order, so, again, sorted map
+		for k, v := range a.unprocessed {
+			id = k
+			ptr = v
+			delete(a.unprocessed, k)
+			break
+		}
+		a.assemble(id, ptr)
+	}
+}
+
+func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
+	value := ptr.Elem()
+
+	// TODO the assembler should cache these
 	typ := value.Type()
 	n := typ.NumField()
 	attrTags := make(map[Ident]indexedAttrTag, n)
@@ -80,19 +105,13 @@ func (a *assembler[T]) Next() (entity *T, err error) {
 			attrTags[attrTag.Ident] = indexedAttrTag{AttrTag: attrTag, i: i}
 		}
 	}
-	var e ID
-	for i, fact := range a.facts {
-		if e == 0 {
-			e = fact.E
-			if e == 0 {
-				err = NewError("assembler.zeroFactE")
-				return
-			}
-			a.pointers[e] = entity
-		} else if e != fact.E {
-			// TODO we could have unresolved refs
-			a.facts = a.facts[i:]
-			return
+
+	offset := sort.Search(len(a.facts), func(i int) bool { return a.facts[i].E >= id })
+	total := len(a.facts)
+	for i := offset; i < total; i++ {
+		fact := a.facts[i]
+		if fact.E != id {
+			break
 		}
 		attrTag, ok := attrTags[fact.A]
 		if !ok {
@@ -139,28 +158,67 @@ func (a *assembler[T]) Next() (entity *T, err error) {
 			case Inst:
 				field.Set(reflect.ValueOf(time.Time(v)))
 			case ID:
-				ptr := field.Addr().Interface()
-				a.pointers[v] = ptr
-				insert(a.needed, v)
+				pointer, ok := a.pointers[v]
+				if ok {
+					field.Set(pointer.Elem())
+				} else {
+					// TODO ugh there's probably some junk about struct field vs value pointers
+					pointer = field.Addr()
+					a.pointers[v] = pointer
+					a.unprocessed[v] = pointer
+				}
 			default:
 				err = NewError("assembler.invalidFactValue")
 				return
 			}
 		}
 	}
-	a.facts = []Fact{}
+	instance, ok := ptr.Interface().(*T)
+	if ok {
+		a.instances[id] = instance
+	}
 	return
 }
 
-func insert[T constraints.Ordered](xs []T, x T) []T {
-	if len(xs) == 0 {
-		return []T{x}
+func (a *assembler[T]) Next() (entity *T, err error) {
+	if len(a.instances) != 0 {
+		// TODO we should return these in id order, so we need a sorted map
+		for id, instance := range a.instances {
+			delete(a.instances, id)
+			entity = instance
+			return
+		}
 	}
-	var placeholder T
-	// note this breaks the contract for BinarySearch. Is that okay?
-	xs = append(xs, placeholder)
-	i, _ := slices.BinarySearch(xs, x)
-	copy(xs[i+1:], xs[i:])
-	xs[i] = x
-	return xs
+	if len(a.facts) == 0 {
+		return
+	}
+	// Find the first id that's not been assembled. Dubious assumption that
+	// it must be of the root type though.
+	// TODO figure out a good way to express the attrs for our root type.
+	var id ID
+	found := false
+	for _, fact := range a.facts {
+		if fact.E == id {
+			continue
+		}
+		id = fact.E
+		_, ok := a.pointers[id]
+		if !ok {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return
+	}
+	a.allocate(id, reflect.TypeOf(a.base))
+	a.assembleAll()
+	instance, ok := a.instances[id]
+	if !ok {
+		err = NewError("assembler.noInstanceForId", "id", id)
+		return
+	}
+	delete(a.instances, id)
+	entity = instance
+	return
 }
