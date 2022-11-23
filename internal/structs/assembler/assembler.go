@@ -3,6 +3,7 @@ package assembler
 
 import (
 	"reflect"
+	"time"
 
 	"github.com/dball/destructive/internal/structs/attrs"
 	. "github.com/dball/destructive/internal/types"
@@ -24,7 +25,7 @@ type indexedAttrTag struct {
 	i int
 }
 
-func Assemble(target any, facts []Fact) (err error) {
+func Assemble(target any, facts []Fact) (unused []Fact, err error) {
 	ptr := reflect.ValueOf(target)
 	if ptr.Kind() != reflect.Pointer {
 		err = NewError("assembler.targetNotPointer")
@@ -48,7 +49,7 @@ func Assemble(target any, facts []Fact) (err error) {
 		attrTags[attrTag.Ident] = indexedAttrTag{AttrTag: attrTag, i: i}
 	}
 	var e ID
-	for _, fact := range facts {
+	for i, fact := range facts {
 		if e == 0 {
 			e = fact.E
 			if e == 0 {
@@ -56,7 +57,7 @@ func Assemble(target any, facts []Fact) (err error) {
 				return
 			}
 		} else if e != fact.E {
-			err = NewError("assembler.invalidFactE", "e", fact.E)
+			unused = facts[i:]
 			return
 		}
 		attrTag, ok := attrTags[fact.A]
@@ -65,9 +66,6 @@ func Assemble(target any, facts []Fact) (err error) {
 			continue
 		}
 		field := value.Field(attrTag.i)
-		// TODO here we're allowing the type of datum value drive the field type.
-		// Presumably, this should be controlled by the attrTag struct, which
-		// considers the field type.
 		if attrTag.Pointer {
 			// TODO who owns the vs anyway? If they're not copied at some point,
 			// exposing value pointers opens the door to database corruption.
@@ -75,18 +73,39 @@ func Assemble(target any, facts []Fact) (err error) {
 			case String:
 				// TODO does this count as a copy for the purpose of ensuring the
 				// outer pointer doesn't change the Fact value?
-				s := string(v)
-				field.Set(reflect.ValueOf(&s))
+				fv := string(v)
+				field.Set(reflect.ValueOf(&fv))
+			case Int:
+				fv := int(v)
+				field.Set(reflect.ValueOf(&fv))
+			case Bool:
+				fv := bool(v)
+				field.Set(reflect.ValueOf(&fv))
+			case Float:
+				fv := float64(v)
+				field.Set(reflect.ValueOf(&fv))
+			case Inst:
+				fv := time.Time(v)
+				field.Set(reflect.ValueOf(&fv))
 			default:
-				err = NewError("assembler.invalidFactV")
+				err = NewError("assembler.invalidFactPointerValue")
 				return
 			}
 		} else {
 			switch v := fact.V.(type) {
 			case String:
 				field.SetString(string(v))
+			case Int:
+				// TODO what about overflows?
+				field.SetInt(int64(v))
+			case Bool:
+				field.SetBool(bool(v))
+			case Float:
+				field.SetFloat(float64(v))
+			case Inst:
+				field.Set(reflect.ValueOf(time.Time(v)))
 			default:
-				err = NewError("assembler.invalidFactV")
+				err = NewError("assembler.invalidFactValue")
 				return
 			}
 		}
