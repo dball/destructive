@@ -76,7 +76,6 @@ func TestSimple(t *testing.T) {
 	})
 }
 
-/*
 func TestStructs(t *testing.T) {
 	type Book struct {
 		Title string `attr:"book/title"`
@@ -87,21 +86,23 @@ func TestStructs(t *testing.T) {
 		Favorite Book   `attr:"person/favorite-book"`
 	}
 
+	var p *Person
+
 	t.Run("value struct field", func(t *testing.T) {
 		facts := []Fact{
 			{E: ID(1), A: Ident("person/name"), V: String("Donald")},
 			{E: ID(1), A: Ident("person/favorite-book"), V: ID(2)},
 			{E: ID(2), A: Ident("book/title"), V: String("Immortality")},
 		}
-		actual := Person{}
-		unused, err := Assemble(&actual, facts)
+		assembler, err := NewAssembler(p, facts)
 		assert.NoError(t, err)
-		assert.Empty(t, unused)
+		actual, err := assembler.Next()
+		assert.NoError(t, err)
+		assert.NotNil(t, actual)
 		expected := Person{Name: "Donald", Favorite: Book{Title: "Immortality"}}
-		assert.Equal(t, expected, actual)
+		assert.Equal(t, expected, *actual)
 	})
 }
-*/
 
 /*
 func TestMapWithValues(t *testing.T) {

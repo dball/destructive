@@ -7,6 +7,8 @@ import (
 
 	"github.com/dball/destructive/internal/structs/attrs"
 	. "github.com/dball/destructive/internal/types"
+	"golang.org/x/exp/constraints"
+	"golang.org/x/exp/slices"
 )
 
 // Fact is a datum whose attribute has been resolved to an ident and has lost
@@ -33,6 +35,8 @@ type assembler[T any] struct {
 	facts []Fact
 	// base is a (nil) pointer to a struct of the type created for root entities.
 	base *T
+	// needed contains the sorted set of ids required to fully populate the assembled.
+	needed []ID
 }
 
 func NewAssembler[T any](base *T, facts []Fact) (a *assembler[T], err error) {
@@ -42,10 +46,14 @@ func NewAssembler[T any](base *T, facts []Fact) (a *assembler[T], err error) {
 		return
 	}
 	// TODO test that the pointer value type is a struct
-	a = &assembler[T]{pointers: map[ID]any{}, facts: facts, base: base}
+	a = &assembler[T]{pointers: map[ID]any{}, facts: facts, base: base, needed: []ID{}}
 	return
 }
 
+// TODO the thing I think we want to do here is peek at the first datum's id, add
+// it to the needed set, perhaps with a populated pointer value, then call some
+// function to Process Everthing Needed, then return the pointer. Maybe also
+// populate a sorted set of pointers of the base type. Something like that.
 func (a *assembler[T]) Next() (entity *T, err error) {
 	// TODO return the next unreturned base entity if we found one via lookahead
 	if len(a.facts) == 0 {
@@ -130,6 +138,10 @@ func (a *assembler[T]) Next() (entity *T, err error) {
 				field.SetFloat(float64(v))
 			case Inst:
 				field.Set(reflect.ValueOf(time.Time(v)))
+			case ID:
+				ptr := field.Addr().Interface()
+				a.pointers[v] = ptr
+				insert(a.needed, v)
 			default:
 				err = NewError("assembler.invalidFactValue")
 				return
@@ -138,4 +150,17 @@ func (a *assembler[T]) Next() (entity *T, err error) {
 	}
 	a.facts = []Fact{}
 	return
+}
+
+func insert[T constraints.Ordered](xs []T, x T) []T {
+	if len(xs) == 0 {
+		return []T{x}
+	}
+	var placeholder T
+	// note this breaks the contract for BinarySearch. Is that okay?
+	xs = append(xs, placeholder)
+	i, _ := slices.BinarySearch(xs, x)
+	copy(xs[i+1:], xs[i:])
+	xs[i] = x
+	return xs
 }
