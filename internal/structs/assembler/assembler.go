@@ -25,6 +25,39 @@ type indexedAttrTag struct {
 	i int
 }
 
+// assembler assembles facts into entities.
+type assembler[T any] struct {
+	// pointers contains references to all entities allocated by this assembler.
+	pointers map[ID]any
+	// facts contains the facts not yet consumed, and must be sorted e-a-v.
+	facts []Fact
+	// base is a (nil) pointer to a struct of the type created for root entities.
+	base *T
+}
+
+func NewAssembler[T any](base *T, facts []Fact) (a *assembler[T], err error) {
+	ptr := reflect.ValueOf(base)
+	if ptr.Kind() != reflect.Pointer {
+		err = NewError("assembler.baseNotPointer")
+		return
+	}
+	// TODO test that the pointer value type is a struct
+	a = &assembler[T]{pointers: map[ID]any{}, facts: facts, base: base}
+	return
+}
+
+func (a *assembler[T]) Next() (entity *T, err error) {
+	if len(a.facts) == 0 {
+		return
+	}
+	// TODO wat seriously
+	ptr := reflect.New(reflect.TypeOf(a.base))
+	p2 := ptr.Elem()
+	ptr.Elem().Set(reflect.New(p2.Type().Elem()))
+	entity = ptr.Elem().Interface().(*T)
+	return
+}
+
 func Assemble(target any, facts []Fact) (unused []Fact, err error) {
 	ptr := reflect.ValueOf(target)
 	if ptr.Kind() != reflect.Pointer {

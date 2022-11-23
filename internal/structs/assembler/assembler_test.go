@@ -8,6 +8,54 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestSimple2(t *testing.T) {
+	type Person struct {
+		Name         string     `attr:"person/name"`
+		Title        *string    `attr:"person/title"`
+		CatCount     int        `attr:"person/cat-count"`
+		DogCount     *int       `attr:"person/dog-count"`
+		LikesPizza   bool       `attr:"person/likes-pizza"`
+		LikesPickles *bool      `attr:"person/likes-pickles"`
+		Score        float64    `attr:"person/score"`
+		TopScore     *float64   `attr:"person/top-score"`
+		Born         time.Time  `attr:"person/born"`
+		Died         *time.Time `attr:"person/died"`
+	}
+	var p *Person
+
+	t.Run("no facts", func(t *testing.T) {
+		assembler, err := NewAssembler(p, []Fact{})
+		assert.NoError(t, err)
+		actual, err := assembler.Next()
+		assert.NoError(t, err)
+		assert.Nil(t, actual)
+	})
+
+	t.Run("one entity of facts", func(t *testing.T) {
+		born := time.Date(1969, 7, 20, 20, 17, 54, 0, time.UTC)
+		died := time.Date(1986, 1, 28, 16, 39, 13, 0, time.UTC)
+		facts := []Fact{
+			{E: ID(1), A: Ident("person/name"), V: String("Donald")},
+			{E: ID(1), A: Ident("person/title"), V: String("Citizen")},
+			{E: ID(1), A: Ident("person/cat-count"), V: Int(4)},
+			{E: ID(1), A: Ident("person/dog-count"), V: Int(0)},
+			{E: ID(1), A: Ident("person/likes-pizza"), V: Bool(true)},
+			{E: ID(1), A: Ident("person/likes-pickles"), V: Bool(true)},
+			{E: ID(1), A: Ident("person/score"), V: Float(2.3)},
+			{E: ID(1), A: Ident("person/top-score"), V: Float(4.2)},
+			{E: ID(1), A: Ident("person/born"), V: Inst(born)},
+			{E: ID(1), A: Ident("person/died"), V: Inst(died)},
+		}
+		assembler, err := NewAssembler(p, facts)
+		assert.NoError(t, err)
+		actual, err := assembler.Next()
+		assert.NoError(t, err)
+		assert.NotNil(t, actual)
+		// TODO populate
+		assert.Equal(t, Person{}, *actual)
+	})
+}
+
 func TestSimple(t *testing.T) {
 	type Person struct {
 		Name         string     `attr:"person/name"`
