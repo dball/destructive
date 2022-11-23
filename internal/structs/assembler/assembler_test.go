@@ -24,7 +24,7 @@ func TestSimple(t *testing.T) {
 	var p *Person
 
 	t.Run("no facts", func(t *testing.T) {
-		assembler, err := NewAssembler(p, []Fact{})
+		assembler, err := NewAssembler2(p, []Fact{})
 		assert.NoError(t, err)
 		actual, err := assembler.Next()
 		assert.NoError(t, err)
@@ -46,7 +46,7 @@ func TestSimple(t *testing.T) {
 			{E: ID(1), A: Ident("person/born"), V: Inst(born)},
 			{E: ID(1), A: Ident("person/died"), V: Inst(died)},
 		}
-		assembler, err := NewAssembler(p, facts)
+		assembler, err := NewAssembler2(p, facts)
 		assert.NoError(t, err)
 		actual, err := assembler.Next()
 		assert.NoError(t, err)
@@ -94,7 +94,7 @@ func TestStructs(t *testing.T) {
 			{E: ID(1), A: Ident("person/favorite-book"), V: ID(2)},
 			{E: ID(2), A: Ident("book/title"), V: String("Immortality")},
 		}
-		assembler, err := NewAssembler(p, facts)
+		assembler, err := NewAssembler2(p, facts)
 		assert.NoError(t, err)
 		actual, err := assembler.Next()
 		assert.NoError(t, err)
