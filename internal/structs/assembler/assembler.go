@@ -47,28 +47,17 @@ func NewAssembler[T any](base *T, facts []Fact) (a *assembler[T], err error) {
 }
 
 func (a *assembler[T]) Next() (entity *T, err error) {
+	// TODO return the next unreturned base entity if we found one via lookahead
 	if len(a.facts) == 0 {
 		return
 	}
 	// TODO wat seriously
-	ptr := reflect.New(reflect.TypeOf(a.base))
-	p2 := ptr.Elem()
-	ptr.Elem().Set(reflect.New(p2.Type().Elem()))
-	entity = ptr.Elem().Interface().(*T)
-	return
-}
+	pp := reflect.New(reflect.TypeOf(a.base))
+	ptr := pp.Elem()
+	pp.Elem().Set(reflect.New(ptr.Type().Elem()))
+	entity = pp.Elem().Interface().(*T)
 
-func Assemble(target any, facts []Fact) (unused []Fact, err error) {
-	ptr := reflect.ValueOf(target)
-	if ptr.Kind() != reflect.Pointer {
-		err = NewError("assembler.targetNotPointer")
-		return
-	}
-	value := ptr.Elem()
-	if value.Kind() != reflect.Struct {
-		err = NewError("assembler.targetValueNotStruct")
-		return
-	}
+	value := pp.Elem().Elem()
 	typ := value.Type()
 	n := typ.NumField()
 	attrTags := make(map[Ident]indexedAttrTag, n)
@@ -79,18 +68,22 @@ func Assemble(target any, facts []Fact) (unused []Fact, err error) {
 			err = attrErr
 			return
 		}
-		attrTags[attrTag.Ident] = indexedAttrTag{AttrTag: attrTag, i: i}
+		if attrTag.Ident != "" {
+			attrTags[attrTag.Ident] = indexedAttrTag{AttrTag: attrTag, i: i}
+		}
 	}
 	var e ID
-	for i, fact := range facts {
+	for i, fact := range a.facts {
 		if e == 0 {
 			e = fact.E
 			if e == 0 {
 				err = NewError("assembler.zeroFactE")
 				return
 			}
+			a.pointers[e] = entity
 		} else if e != fact.E {
-			unused = facts[i:]
+			// TODO we could have unresolved refs
+			a.facts = a.facts[i:]
 			return
 		}
 		attrTag, ok := attrTags[fact.A]
@@ -143,5 +136,6 @@ func Assemble(target any, facts []Fact) (unused []Fact, err error) {
 			}
 		}
 	}
+	a.facts = []Fact{}
 	return
 }
