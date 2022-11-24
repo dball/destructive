@@ -84,22 +84,25 @@ func TestStructs(t *testing.T) {
 	type Person struct {
 		Name     string `attr:"person/name"`
 		Favorite Book   `attr:"person/favorite-book"`
+		Best     *Book  `attr:"person/best-book"`
 	}
 
 	var p *Person
 
-	t.Run("value struct field", func(t *testing.T) {
+	t.Run("struct fields", func(t *testing.T) {
 		facts := []Fact{
 			{E: ID(1), A: Ident("person/name"), V: String("Donald")},
 			{E: ID(1), A: Ident("person/favorite-book"), V: ID(2)},
+			{E: ID(1), A: Ident("person/best-book"), V: ID(3)},
 			{E: ID(2), A: Ident("book/title"), V: String("Immortality")},
+			{E: ID(3), A: Ident("book/title"), V: String("The Parable of the Sower")},
 		}
 		assembler, err := NewAssembler(p, facts)
 		assert.NoError(t, err)
 		actual, err := assembler.Next()
 		assert.NoError(t, err)
 		assert.NotNil(t, actual)
-		expected := Person{Name: "Donald", Favorite: Book{Title: "Immortality"}}
+		expected := Person{Name: "Donald", Favorite: Book{Title: "Immortality"}, Best: &Book{Title: "The Parable of the Sower"}}
 		assert.Equal(t, expected, *actual)
 	})
 }

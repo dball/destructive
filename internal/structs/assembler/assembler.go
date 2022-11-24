@@ -140,6 +140,22 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 			case Inst:
 				fv := time.Time(v)
 				field.Set(reflect.ValueOf(&fv))
+			case ID:
+				pointer, ok := a.pointers[v]
+				if ok {
+					field.Set(pointer)
+				} else {
+					pp := reflect.New(field.Type())
+					pointer = pp.Elem()
+					// allocate the new struct
+					entity := reflect.New(pointer.Type().Elem())
+					// set the pointer to the new struct
+					pointer.Set(entity)
+					// set the field to the pointer
+					field.Set(pointer)
+					a.pointers[v] = pointer
+					a.unprocessed[v] = pointer
+				}
 			default:
 				err = NewError("assembler.invalidFactPointerValue")
 				return
@@ -162,7 +178,6 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 				if ok {
 					field.Set(pointer.Elem())
 				} else {
-					// TODO ugh there's probably some junk about struct field vs value pointers
 					pointer = field.Addr()
 					a.pointers[v] = pointer
 					a.unprocessed[v] = pointer
