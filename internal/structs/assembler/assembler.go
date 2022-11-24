@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dball/destructive/internal/structs/attrs"
+	"github.com/dball/destructive/internal/sys"
 	. "github.com/dball/destructive/internal/types"
 )
 
@@ -113,6 +114,13 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 		if fact.E != id {
 			break
 		}
+		if i == offset {
+			attrTag, ok := attrTags[Ident(sys.DbId)]
+			if ok {
+				field := value.Field(attrTag.i)
+				field.SetUint(uint64(id))
+			}
+		}
 		attrTag, ok := attrTags[fact.A]
 		if !ok {
 			// We don't care if we get a fact with no field.
@@ -174,13 +182,17 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 			case Inst:
 				field.Set(reflect.ValueOf(time.Time(v)))
 			case ID:
-				pointer, ok := a.pointers[v]
-				if ok {
-					field.Set(pointer.Elem())
+				if attrTag.Ident == sys.DbId {
+					field.SetUint(uint64(v))
 				} else {
-					pointer = field.Addr()
-					a.pointers[v] = pointer
-					a.unprocessed[v] = pointer
+					pointer, ok := a.pointers[v]
+					if ok {
+						field.Set(pointer.Elem())
+					} else {
+						pointer = field.Addr()
+						a.pointers[v] = pointer
+						a.unprocessed[v] = pointer
+					}
 				}
 			default:
 				err = NewError("assembler.invalidFactValue")

@@ -10,6 +10,7 @@ import (
 
 func TestSimple(t *testing.T) {
 	type Person struct {
+		ID           uint64     `attr:"sys/db/id"`
 		Name         string     `attr:"person/name"`
 		Title        *string    `attr:"person/title"`
 		CatCount     int        `attr:"person/cat-count"`
@@ -56,6 +57,7 @@ func TestSimple(t *testing.T) {
 		yes := true
 		fourPointTwo := 4.2
 		expected := Person{
+			ID:           1,
 			Name:         "Donald",
 			Title:        &title,
 			CatCount:     4,
