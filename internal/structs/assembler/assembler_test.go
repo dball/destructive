@@ -109,6 +109,36 @@ func TestStructs(t *testing.T) {
 	})
 }
 
+func TestStructCycles(t *testing.T) {
+	type Person struct {
+		Name string  `attr:"person/name"`
+		BFF  *Person `attr:"person/bff"`
+	}
+	var p *Person
+	facts := []Fact{
+		{E: ID(1), A: Ident("person/name"), V: String("Momo")},
+		{E: ID(1), A: Ident("person/bff"), V: ID(2)},
+		{E: ID(2), A: Ident("person/name"), V: String("Pabu")},
+		{E: ID(2), A: Ident("person/bff"), V: ID(1)},
+	}
+	assembler, err := NewAssembler(p, facts)
+	assert.NoError(t, err)
+	actual, err := assembler.Next()
+	assert.NoError(t, err)
+	assert.NotNil(t, actual)
+	// We cannot assert equality on the structs themselves because they
+	// mutually refer.
+	assert.Equal(t, "Momo", actual.Name)
+	assert.Equal(t, "Pabu", actual.BFF.Name)
+	assert.Equal(t, "Momo", actual.BFF.BFF.Name)
+
+	actual, err = assembler.Next()
+	assert.NoError(t, err)
+	assert.Equal(t, "Pabu", actual.Name)
+	assert.Equal(t, "Momo", actual.BFF.Name)
+	assert.Equal(t, "Pabu", actual.BFF.BFF.Name)
+}
+
 /*
 func TestMapWithValues(t *testing.T) {
 	type Book struct {
