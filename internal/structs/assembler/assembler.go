@@ -57,10 +57,10 @@ func NewAssembler[T any](base *T, facts []Fact) (a *assembler[T], err error) {
 	return a, err
 }
 
-func (a *assembler[T]) allocate(id ID, pointerType reflect.Type) {
+func (a *assembler[T]) allocate(id ID, pointerType reflect.Type) (ptr reflect.Value) {
 	// allocate the new pointer
 	pp := reflect.New(pointerType)
-	ptr := pp.Elem()
+	ptr = pp.Elem()
 	// allocate the new struct
 	entity := reflect.New(ptr.Type().Elem())
 	// store the new struct in the new pointer
@@ -68,9 +68,10 @@ func (a *assembler[T]) allocate(id ID, pointerType reflect.Type) {
 	// store the pointer in the unrealized entities map
 	a.unprocessed[id] = ptr
 	a.pointers[id] = ptr
+	return
 }
 
-func (a *assembler[T]) assembleAll() {
+func (a *assembler[T]) assembleAll() (err error) {
 	for {
 		if len(a.unprocessed) == 0 {
 			break
@@ -84,8 +85,12 @@ func (a *assembler[T]) assembleAll() {
 			delete(a.unprocessed, k)
 			break
 		}
-		a.assemble(id, ptr)
+		err = a.assemble(id, ptr)
+		if err != nil {
+			return
+		}
 	}
+	return
 }
 
 func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
@@ -153,16 +158,8 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 				if ok {
 					field.Set(pointer)
 				} else {
-					pp := reflect.New(field.Type())
-					pointer = pp.Elem()
-					// allocate the new struct
-					entity := reflect.New(pointer.Type().Elem())
-					// set the pointer to the new struct
-					pointer.Set(entity)
-					// set the field to the pointer
+					pointer := a.allocate(v, field.Type())
 					field.Set(pointer)
-					a.pointers[v] = pointer
-					a.unprocessed[v] = pointer
 				}
 			default:
 				err = NewError("assembler.invalidFactPointerValue")
@@ -239,7 +236,10 @@ func (a *assembler[T]) Next() (entity *T, err error) {
 		return
 	}
 	a.allocate(id, reflect.TypeOf(a.base))
-	a.assembleAll()
+	err = a.assembleAll()
+	if err != nil {
+		return
+	}
 	instance, ok := a.instances[id]
 	if !ok {
 		err = NewError("assembler.noInstanceForId", "id", id)
