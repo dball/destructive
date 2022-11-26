@@ -241,15 +241,40 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 }
 
 func (as *assembler[T]) findValue(e ID, a Ident) (v any) {
-	// TODO sorted search
-	for _, fact := range as.facts {
-		if fact.E == e && fact.A == a {
-			switch x := fact.V.(type) {
-			case String:
-				v = string(x)
-				// TODO all the cases, if we accept this outcome
-			}
-			break
+	i, ok := sort.Find(len(as.facts), func(i int) int {
+		fact := as.facts[i]
+		switch {
+		case fact.E < e:
+			return 1
+		case fact.E > e:
+			return -1
+		}
+		switch {
+		case fact.A < a:
+			return 1
+		case fact.A > a:
+			return -1
+		}
+		return 0
+	})
+	if ok {
+		fact := as.facts[i]
+		switch x := fact.V.(type) {
+		// TODO cases
+		case String:
+			v = string(x)
+		case Int:
+			v = int64(x)
+		case Bool:
+			v = bool(x)
+		case Float:
+			v = float64(x)
+		case Inst:
+			v = time.Time(x)
+		case ID:
+			v = uint64(x)
+		default:
+			panic("assembler.invalidFactValue")
 		}
 	}
 	return
@@ -257,8 +282,10 @@ func (as *assembler[T]) findValue(e ID, a Ident) (v any) {
 
 func (a *assembler[T]) addEntityToMap(mapKey Ident, m reflect.Value, id ID, pointer reflect.Value, immediate bool) {
 	if immediate {
-		// TODO instead of looking up the value anew and recasting the value, we could instead derive the
-		// index of the field in the pointer struct that contains the map key field.
+		// findValue is the only way of finding the key value when it's not present on the value struct,
+		// though is plausibly much less efficient when that is the case. It might be useful to optimize
+		// that common case by constructing a more robust (cached) model of a struct's attributes that
+		// allows lookup by ident and use that to lookup the field value by index here.
 		key := a.findValue(id, mapKey)
 		value := pointer.Elem()
 		m.SetMapIndex(reflect.ValueOf(key), value)
