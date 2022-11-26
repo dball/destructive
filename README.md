@@ -109,3 +109,125 @@ This specifies that the attribute's value is unique in the database, only one en
 * `sys/attr/unique/value`
 
 Both enforce the uniqueness constraint. The only difference is that when asserting claims, if a tempid is used in a claim for this attribute, and an entity already asserts the claimed value, the tempid will resolve to the extant entity for identity uniqueness. By contrast, a value uniqueness attribute will cause the claim to be rejected.
+
+### sys/db/rank
+
+This is a system-managed attribute assigned to the entities that comprise ordered lists. These
+are integers, must have unique values in their container entity, and provide an ordering for the
+referent entities.
+
+## Structs
+
+Structs are the dominant choice for modeling domain data in Golang, therefore to be useful, this library must provide excellent integration with them.
+
+Structs may be given to the database to record, and may be requested of the database as populated results. Both uses are governed by struct tags.
+
+Each struct represents an entity in the database. Fields on the structs that map to attributes are declared using the `attr` struct tag with a value of the attribute's ident:
+
+```go
+type Person struct {
+  Name string `attr:"person/name"`
+}
+```
+
+The ident may be followed by one or more tag directives separated by commas.
+
+Entities do not have strong associations with the structs from which they may have been recorded. It is perfectly reasonably to load an entity into a different type of struct than that from which it was recorded.
+
+### Types
+
+The Golang field type governs the type of the attribute. Value and pointer types of this list are supported:
+
+* `string`
+* `int` (this will probably become `int64` for clarity)
+* `bool`
+* `float64`
+* `time.Time`
+
+The system id may also be recorded in a `uint64` field with a `sys/db/id` ident.
+
+When a scalar field has a pointer type, `nil` is taken to indicate the affirmative absence of a value for the attribute. When it has a value type, the empty value is treated like any other unless
+the `ignoreempty` directive is present, in which case empty values are treated like `nil` values in
+the pointer case.
+
+### References and Collections
+
+In addition to scalar values, fields may contain structs, pointers to structs, slices of scalars or structs, and maps of structs indexed by entity values.
+
+#### Struct references
+
+Struct references correspond to ref attributes. When recording structs, references to structs with
+attribute tags are following recursively, with each struct pointer being processed once only. It is
+recommended therefore when recording graphs that admit cycles or duplicates to use pointers. For example:
+
+```go
+type Person struct {
+  Name string `attr:"person/name"`
+  BestFriend *Person `attr:"person/best-friend"`
+}
+```
+
+#### Slices
+
+Slices of structs are fairly straightforward:
+
+```go
+type Person struct {
+  Name string `attr:"person/name"`
+  Pets []Pet `attr:"person/pets"`
+}
+
+type Pet struct {
+  Name string `attr:"pet/name"`
+}
+```
+
+Slices will be recorded and presented in order by introducing the system-managed `db/sys/rank` attribute. Sliced collections are assumed to be complete when recording, and will therefore
+retract any extant entries other than those given in the record.
+
+Struct slices have pointer values, though nils are not allowed when recording.
+
+Slices of scalars are also allowed:
+
+```go
+type Person struct {
+  Name string `attr:"person/name"`
+  Measurements []float64 `person/measurement,value=test/measurement`
+}
+```
+
+but require a `value=` tag directive to indicate the attribute of the scalar values. Slices of
+scalars may not have pointer values.
+
+#### Maps
+
+Fields may contain maps of structs indexed by values that may or may not be present in the referent structs. For example:
+
+```go
+type Person struct {
+  Name string `attr:"person/name"`
+  FavoriteBooks map[string]Book `attr:"person/favorite-books,key=book/title"`
+}
+
+type Book struct {
+  Name string `attr:"book/title"`
+  Author string `attr:"book/author"`
+}
+```
+
+If the map key is present in the value struct, they must be consistent when recording.
+
+Map values may be structs or pointers to structs.
+
+### Recording
+
+#### Identities
+
+Fields may declare they correspond to `unique` or `identity` attributes by including those as directives. They are mutually inconsistent, only one way be given. Structs may have multiple such attributes, and may also have a database id field.
+
+When recording an entity, if none of these values resolve to an extant entity, a new entity will be created. If they resolve to a single entity, subject to the constraints of the `identity` attributes, the given attribute values are recorded. Except as noted above for sorted collections, any existing attributes not reflected in the recorded struct are left untouched.
+
+If the identifiers resolve to multiple extant entities, or if the struct does not have an id and any `identity` attributes resolve to an extant entity, the recording will fail.
+
+Structs are currently retracted in full, that is to say, all attributes of the resolved entity
+are retracted.
