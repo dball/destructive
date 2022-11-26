@@ -132,7 +132,7 @@ type Person struct {
 
 The ident may be followed by one or more tag directives separated by commas.
 
-Entities do not have strong associations with the structs from which they may have been recorded. It is perfectly reasonably to load an entity into a different type of struct than that from which it was recorded.
+Entities do not have strong associations with the structs from which they may have been recorded. It is perfectly reasonable to load an entity into a different type of struct than that from which it was recorded.
 
 ### Types
 
@@ -225,9 +225,9 @@ Map values may be structs or pointers to structs.
 
 Fields may declare they correspond to `unique` or `identity` attributes by including those as directives. They are mutually inconsistent, only one way be given. Structs may have multiple such attributes, and may also have a database id field.
 
-When recording an entity, if none of these values resolve to an extant entity, a new entity will be created. If they resolve to a single entity, subject to the constraints of the `identity` attributes, the given attribute values are recorded. Except as noted above for sorted collections, any existing attributes not reflected in the recorded struct are left untouched.
+When recording an entity, if none of these values resolve to an extant entity, a new entity will be created. If they resolve to a single entity, subject to the constraints of the `unique` attributes, the given attribute values are recorded. Except as noted above for sorted collections, any existing attributes not reflected in the recorded struct are left untouched.
 
-If the identifiers resolve to multiple extant entities, or if the struct does not have an id and any `identity` attributes resolve to an extant entity, the recording will fail.
+If the identifiers resolve to multiple extant entities, or if the struct does not have an id and any `unique` attributes resolve to an extant entity, the recording will fail.
 
 Structs are currently retracted in full, that is to say, all attributes of the resolved entity
 are retracted.

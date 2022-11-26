@@ -11,8 +11,8 @@ import (
 func TestShred(t *testing.T) {
 	type person struct {
 		id   uint   `attr:"sys/db/id"`
-		name string `attr:"person/name,unique"`
-		uuid string `attr:"person/uuid,identity,ignoreempty"`
+		name string `attr:"person/name,identity"`
+		uuid string `attr:"person/uuid,unique,ignoreempty"`
 		age  int    `attr:"person/age,ignoreempty"`
 		pets *int   `attr:"person/pets"`
 		// struct fields must be public to be shredded unless we go unsafe
