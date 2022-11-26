@@ -165,7 +165,41 @@ func TestMapWithStructValues(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, actual)
 	assert.Equal(t, "Donald", actual.Name)
+	assert.Equal(t, 2, len(actual.Favs))
 	assert.Equal(t, Book{Title: "Legendborn", Genre: "ya"}, actual.Favs["Legendborn"])
 	assert.Equal(t, Book{Title: "The Actual Star", Genre: "specfic"}, actual.Favs["The Actual Star"])
+}
+
+func TestMapWithPointerValues(t *testing.T) {
+	type Book struct {
+		Title string `attr:"book/title"`
+		Genre string `attr:"book/genre"`
+	}
+	type Person struct {
+		Name string           `attr:"person/name"`
+		Favs map[string]*Book `attr:"person/favs,key=book/title"`
+	}
+
+	var p *Person
+	facts := []Fact{
+		{E: ID(1), A: Ident("person/name"), V: String("Donald")},
+		{E: ID(1), A: Ident("person/favs"), V: ID(2)},
+		{E: ID(1), A: Ident("person/favs"), V: ID(3)},
+		{E: ID(2), A: Ident("book/genre"), V: String("ya")},
+		{E: ID(2), A: Ident("book/title"), V: String("Legendborn")},
+		{E: ID(3), A: Ident("book/genre"), V: String("specfic")},
+		{E: ID(3), A: Ident("book/title"), V: String("The Actual Star")},
+	}
+	assembler, err := NewAssembler(p, facts)
+	assert.NoError(t, err)
+	actual, err := assembler.Next()
+	assert.NoError(t, err)
+	assert.NotNil(t, actual)
+	assert.Equal(t, "Donald", actual.Name)
 	assert.Equal(t, 2, len(actual.Favs))
+	book := actual.Favs["Legendborn"]
+	assert.NotNil(t, book)
+	assert.Equal(t, Book{Title: "Legendborn", Genre: "ya"}, *book)
+	book = actual.Favs["The Actual Star"]
+	assert.Equal(t, Book{Title: "The Actual Star", Genre: "specfic"}, *book)
 }

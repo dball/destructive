@@ -28,9 +28,10 @@ type indexedAttrTag struct {
 }
 
 type mapAwaitingEntry struct {
-	mapKey  Ident
-	m       reflect.Value
-	pointer reflect.Value
+	mapKey         Ident
+	m              reflect.Value
+	pointer        reflect.Value
+	mapHasPointers bool
 }
 
 type assembler[T any] struct {
@@ -204,12 +205,16 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 						// TODO is this right? it feels weird.
 						m = field
 					}
+					mapValueType := m.Type().Elem()
+					mapHasPointers := mapValueType.Kind() == reflect.Pointer
+					if mapHasPointers {
+						mapValueType = mapValueType.Elem()
+					}
 					pointer, ok := a.pointers[v]
 					if !ok {
-						// TODO pointerTo won't be right if the map contains pointers, not structs
-						pointer = a.allocate(v, reflect.PointerTo(m.Type().Elem()))
+						pointer = a.allocate(v, reflect.PointerTo(mapValueType))
 					}
-					a.addEntityToMap(attrTag.MapKey, m, v, pointer, ok)
+					a.addEntityToMap(attrTag.MapKey, m, v, pointer, mapHasPointers, ok)
 				default:
 					pointer, ok := a.pointers[v]
 					if ok {
@@ -229,7 +234,7 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 	maes, ok := a.mapsAwaitingEntries[id]
 	if ok {
 		for _, mae := range maes {
-			a.addEntityToMap(mae.mapKey, mae.m, id, mae.pointer, true)
+			a.addEntityToMap(mae.mapKey, mae.m, id, mae.pointer, mae.mapHasPointers, true)
 		}
 		delete(a.mapsAwaitingEntries, id)
 	}
@@ -280,18 +285,21 @@ func (as *assembler[T]) findValue(e ID, a Ident) (v any) {
 	return
 }
 
-func (a *assembler[T]) addEntityToMap(mapKey Ident, m reflect.Value, id ID, pointer reflect.Value, immediate bool) {
+func (a *assembler[T]) addEntityToMap(mapKey Ident, m reflect.Value, id ID, pointer reflect.Value, mapHasPointers bool, immediate bool) {
 	if immediate {
 		// findValue is the only way of finding the key value when it's not present on the value struct,
 		// though is plausibly much less efficient when that is the case. It might be useful to optimize
 		// that common case by constructing a more robust (cached) model of a struct's attributes that
 		// allows lookup by ident and use that to lookup the field value by index here.
 		key := a.findValue(id, mapKey)
-		value := pointer.Elem()
+		value := pointer
+		if !mapHasPointers {
+			value = pointer.Elem()
+		}
 		m.SetMapIndex(reflect.ValueOf(key), value)
 		return
 	}
-	mae := mapAwaitingEntry{mapKey, m, pointer}
+	mae := mapAwaitingEntry{mapKey, m, pointer, mapHasPointers}
 	maes, ok := a.mapsAwaitingEntries[id]
 	if !ok {
 		a.mapsAwaitingEntries[id] = []mapAwaitingEntry{mae}
