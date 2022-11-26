@@ -154,10 +154,10 @@ func TestMapWithStructValues(t *testing.T) {
 		{E: ID(1), A: Ident("person/name"), V: String("Donald")},
 		{E: ID(1), A: Ident("person/favs"), V: ID(2)},
 		{E: ID(1), A: Ident("person/favs"), V: ID(3)},
-		{E: ID(2), A: Ident("book/title"), V: String("Legendborn")},
 		{E: ID(2), A: Ident("book/genre"), V: String("ya")},
-		{E: ID(3), A: Ident("book/title"), V: String("The Actual Star")},
+		{E: ID(2), A: Ident("book/title"), V: String("Legendborn")},
 		{E: ID(3), A: Ident("book/genre"), V: String("specfic")},
+		{E: ID(3), A: Ident("book/title"), V: String("The Actual Star")},
 	}
 	assembler, err := NewAssembler(p, facts)
 	assert.NoError(t, err)

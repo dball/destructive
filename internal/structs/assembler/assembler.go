@@ -28,7 +28,7 @@ type indexedAttrTag struct {
 }
 
 type mapAwaitingEntry struct {
-	attrTag indexedAttrTag
+	mapKey  Ident
 	m       reflect.Value
 	pointer reflect.Value
 }
@@ -209,7 +209,7 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 						// TODO pointerTo won't be right if the map contains pointers, not structs
 						pointer = a.allocate(v, reflect.PointerTo(m.Type().Elem()))
 					}
-					a.addEntityToMap(attrTag, m, v, pointer, ok)
+					a.addEntityToMap(attrTag.MapKey, m, v, pointer, ok)
 				default:
 					pointer, ok := a.pointers[v]
 					if ok {
@@ -229,7 +229,7 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 	maes, ok := a.mapsAwaitingEntries[id]
 	if ok {
 		for _, mae := range maes {
-			a.addEntityToMap(mae.attrTag, mae.m, id, mae.pointer, true)
+			a.addEntityToMap(mae.mapKey, mae.m, id, mae.pointer, true)
 		}
 		delete(a.mapsAwaitingEntries, id)
 	}
@@ -240,16 +240,31 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 	return
 }
 
-func (a *assembler[T]) addEntityToMap(attrTag indexedAttrTag, m reflect.Value, id ID, pointer reflect.Value, immediate bool) {
+func (as *assembler[T]) findValue(e ID, a Ident) (v any) {
+	// TODO sorted search
+	for _, fact := range as.facts {
+		if fact.E == e && fact.A == a {
+			switch x := fact.V.(type) {
+			case String:
+				v = string(x)
+				// TODO all the cases, if we accept this outcome
+			}
+			break
+		}
+	}
+	return
+}
+
+func (a *assembler[T]) addEntityToMap(mapKey Ident, m reflect.Value, id ID, pointer reflect.Value, immediate bool) {
 	if immediate {
+		// TODO instead of looking up the value anew and recasting the value, we could instead derive the
+		// index of the field in the pointer struct that contains the map key field.
+		key := a.findValue(id, mapKey)
 		value := pointer.Elem()
-		// TODO the field index is just wrong, though it's coincidentally working wtf
-		// but more to the point, the value retrieved from the map ultimately is an empty struct??
-		key := value.Field(attrTag.i)
-		m.SetMapIndex(key, value)
+		m.SetMapIndex(reflect.ValueOf(key), value)
 		return
 	}
-	mae := mapAwaitingEntry{attrTag, m, pointer}
+	mae := mapAwaitingEntry{mapKey, m, pointer}
 	maes, ok := a.mapsAwaitingEntries[id]
 	if !ok {
 		a.mapsAwaitingEntries[id] = []mapAwaitingEntry{mae}
