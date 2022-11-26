@@ -139,7 +139,6 @@ func TestStructCycles(t *testing.T) {
 	assert.Equal(t, "Pabu", actual.BFF.BFF.Name)
 }
 
-/*
 func TestMapWithStructValues(t *testing.T) {
 	type Book struct {
 		Title string `attr:"book/title"`
@@ -165,13 +164,8 @@ func TestMapWithStructValues(t *testing.T) {
 	actual, err := assembler.Next()
 	assert.NoError(t, err)
 	assert.NotNil(t, actual)
-	expected := Person{
-		Name: "Donald",
-		Favs: map[string]Book{
-			"Legendborn":      {Title: "Legendborn", Genre: "ya"},
-			"The Actual Star": {Title: "The Actual Star", Genre: "specfic"},
-		},
-	}
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, "Donald", actual.Name)
+	assert.Equal(t, Book{Title: "Legendborn", Genre: "ya"}, actual.Favs["Legendborn"])
+	assert.Equal(t, Book{Title: "The Actual Star", Genre: "specfic"}, actual.Favs["The Actual Star"])
+	assert.Equal(t, 2, len(actual.Favs))
 }
-*/

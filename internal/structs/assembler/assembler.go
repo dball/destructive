@@ -27,6 +27,12 @@ type indexedAttrTag struct {
 	i int
 }
 
+type mapAwaitingEntry struct {
+	attrTag indexedAttrTag
+	m       reflect.Value
+	pointer reflect.Value
+}
+
 type assembler[T any] struct {
 	// base is a (nil) pointer to a struct of the root entity type
 	base *T
@@ -38,6 +44,8 @@ type assembler[T any] struct {
 	pointers map[ID]reflect.Value
 	// unprocessed are (not nil) pointers to unrealized entities
 	unprocessed map[ID]reflect.Value
+	// mapsAwaitingEntries are maps in entity struct fields awaiting referent entities to be realized
+	mapsAwaitingEntries map[ID][]mapAwaitingEntry
 }
 
 func NewAssembler[T any](base *T, facts []Fact) (a *assembler[T], err error) {
@@ -48,11 +56,12 @@ func NewAssembler[T any](base *T, facts []Fact) (a *assembler[T], err error) {
 	}
 	// TODO test that the pointer value type is a struct
 	a = &assembler[T]{
-		base:        base,
-		facts:       facts,
-		instances:   map[ID]*T{},
-		pointers:    map[ID]reflect.Value{},
-		unprocessed: map[ID]reflect.Value{},
+		base:                base,
+		facts:               facts,
+		instances:           map[ID]*T{},
+		pointers:            map[ID]reflect.Value{},
+		unprocessed:         map[ID]reflect.Value{},
+		mapsAwaitingEntries: map[ID][]mapAwaitingEntry{},
 	}
 	return a, err
 }
@@ -179,9 +188,29 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 			case Inst:
 				field.Set(reflect.ValueOf(time.Time(v)))
 			case ID:
-				if attrTag.Ident == sys.DbId {
+				switch {
+				case attrTag.Ident == sys.DbId:
 					field.SetUint(uint64(v))
-				} else {
+				case attrTag.MapKey != "":
+					if field.Kind() != reflect.Map {
+						err = NewError("assembler.invalidFactMapValue")
+						return
+					}
+					var m reflect.Value
+					if field.IsNil() {
+						m = reflect.MakeMap(field.Type())
+						field.Set(m)
+					} else {
+						// TODO is this right? it feels weird.
+						m = field
+					}
+					pointer, ok := a.pointers[v]
+					if !ok {
+						// TODO pointerTo won't be right if the map contains pointers, not structs
+						pointer = a.allocate(v, reflect.PointerTo(m.Type().Elem()))
+					}
+					a.addEntityToMap(attrTag, m, v, pointer, ok)
+				default:
 					pointer, ok := a.pointers[v]
 					if ok {
 						field.Set(pointer.Elem())
@@ -197,11 +226,37 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 			}
 		}
 	}
+	maes, ok := a.mapsAwaitingEntries[id]
+	if ok {
+		for _, mae := range maes {
+			a.addEntityToMap(mae.attrTag, mae.m, id, mae.pointer, true)
+		}
+		delete(a.mapsAwaitingEntries, id)
+	}
 	instance, ok := ptr.Interface().(*T)
 	if ok {
 		a.instances[id] = instance
 	}
 	return
+}
+
+func (a *assembler[T]) addEntityToMap(attrTag indexedAttrTag, m reflect.Value, id ID, pointer reflect.Value, immediate bool) {
+	if immediate {
+		value := pointer.Elem()
+		// TODO the field index is just wrong, though it's coincidentally working wtf
+		// but more to the point, the value retrieved from the map ultimately is an empty struct??
+		key := value.Field(attrTag.i)
+		m.SetMapIndex(key, value)
+		return
+	}
+	mae := mapAwaitingEntry{attrTag, m, pointer}
+	maes, ok := a.mapsAwaitingEntries[id]
+	if !ok {
+		a.mapsAwaitingEntries[id] = []mapAwaitingEntry{mae}
+	} else {
+		maes = append(maes, mae)
+		a.mapsAwaitingEntries[id] = maes
+	}
 }
 
 func (a *assembler[T]) Next() (entity *T, err error) {
