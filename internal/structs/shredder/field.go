@@ -9,8 +9,8 @@ import (
 
 type values []any
 
-func getFieldValue(pointers map[reflect.Value]TempID, fieldType reflect.StructField, fieldValue reflect.Value) (val any, err error) {
-	switch fieldType.Type.Kind() {
+func getFieldValue(pointers map[reflect.Value]TempID, fieldType reflect.Type, fieldValue reflect.Value) (val any, err error) {
+	switch fieldType.Kind() {
 	case reflect.Bool:
 		val = Bool(fieldValue.Bool())
 	case reflect.Int:
@@ -48,7 +48,7 @@ func getFieldValue(pointers map[reflect.Value]TempID, fieldType reflect.StructFi
 		val = vals
 	case reflect.Pointer:
 		if !fieldValue.IsNil() {
-			switch fieldType.Type.Elem().Kind() {
+			switch fieldType.Elem().Kind() {
 			case reflect.Bool:
 				val = Bool(fieldValue.Elem().Bool())
 			case reflect.Int:

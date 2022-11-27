@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/dball/destructive/internal/structs/attrs"
+	"github.com/dball/destructive/internal/structs/models"
 	"github.com/dball/destructive/internal/sys"
 	. "github.com/dball/destructive/internal/types"
 )
@@ -105,34 +105,29 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim,
 		err = NewError("shredder.invalidStruct", "type", typ)
 		return
 	}
-	n := typ.NumField()
-	claims = make([]*Claim, 0, n)
+	model, modelErr := models.Analyze(typ)
+	if modelErr != nil {
+		err = modelErr
+		return
+	}
+	claims = make([]*Claim, 0, len(model.AttrFields))
 	var refFieldsClaims []*Claim
-	for i := 0; i < n; i++ {
-		fieldType := typ.Field(i)
-		attr, attrErr := attrs.ParseAttrField(fieldType)
-		if attrErr != nil {
-			err = attrErr
-			return
-		}
-		if attr.Ident == "" {
-			continue
-		}
-		fieldValue := fields.Field(i)
+	for _, attr := range model.AttrFields {
+		fieldValue := fields.Field(attr.Index)
 		if attr.Ident == sys.DbId {
-			switch fieldType.Type.Kind() {
+			switch attr.FieldType.Kind() {
 			case reflect.Uint:
 				if fieldValue.IsZero() {
 					continue
 				}
 				tempidConstraints[ID(fieldValue.Uint())] = Void{}
 			default:
-				err = NewError("shredder.invalidIdFieldType", "type", fieldType)
+				err = NewError("shredder.invalidIdFieldType", "type", attr.FieldType)
 				return
 			}
 			continue
 		}
-		val, fieldErr := getFieldValue(confetti.pointers, fieldType, fieldValue)
+		val, fieldErr := getFieldValue(confetti.pointers, attr.FieldType, fieldValue)
 		if fieldErr != nil {
 			err = fieldErr
 			return
@@ -232,28 +227,23 @@ func (s *shredder) retract(confetti *confetti, x any) (e TempID, claims []*Claim
 		err = NewError("shredder.invalidStruct", "type", typ)
 		return
 	}
-	n := typ.NumField()
+	model, modelErr := models.Analyze(typ)
+	if modelErr != nil {
+		err = modelErr
+		return
+	}
 	claims = []*Claim{{E: e, Retract: true}}
-	for i := 0; i < n; i++ {
-		fieldType := typ.Field(i)
-		attr, attrErr := attrs.ParseAttrField(fieldType)
-		if attrErr != nil {
-			err = attrErr
-			return
-		}
-		if attr.Ident == "" {
-			continue
-		}
-		fieldValue := fields.Field(i)
+	for _, attr := range model.AttrFields {
+		fieldValue := fields.Field(attr.Index)
 		if attr.Ident == sys.DbId {
-			switch fieldType.Type.Kind() {
+			switch attr.FieldType.Kind() {
 			case reflect.Uint:
 				if fieldValue.IsZero() {
 					continue
 				}
 				tempidConstraints[ID(fieldValue.Uint())] = Void{}
 			default:
-				err = NewError("shredder.invalidIdFieldType", "type", fieldType)
+				err = NewError("shredder.invalidIdFieldType", "type", attr.FieldType)
 				return
 			}
 			continue
@@ -261,7 +251,7 @@ func (s *shredder) retract(confetti *confetti, x any) (e TempID, claims []*Claim
 		if attr.Unique == 0 {
 			continue
 		}
-		vref, fieldErr := getFieldValue(confetti.pointers, fieldType, fieldValue)
+		vref, fieldErr := getFieldValue(confetti.pointers, attr.FieldType, fieldValue)
 		if fieldErr != nil {
 			err = fieldErr
 			return

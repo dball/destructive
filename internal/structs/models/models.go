@@ -14,12 +14,14 @@ import (
 type StructModel struct {
 	// Type is the struct type, whose kind must be a struct.
 	Type reflect.Type
-	// AttrFields are the fields bound to attributes, indexed by ident.
-	AttrFields map[Ident]AttrFieldModel
+	// AttrFields are the fields bound to attributes, in field order.
+	AttrFields []AttrFieldModel
 }
 
 // AttrFieldModel models a field bound to an attribute.
 type AttrFieldModel struct {
+	// Ident is the ident of the attr.
+	Ident Ident
 	// Index is the position of the field in the struct.
 	Index int
 	// FieldType is the field's go type.
@@ -63,32 +65,32 @@ func Analyze(typ reflect.Type) (model StructModel, err error) {
 	}
 	model.Type = typ
 	n := typ.NumField()
-	attrFields := make(map[Ident]AttrFieldModel, n)
+	attrFields := make([]AttrFieldModel, 0, n)
 	for i := 0; i < n; i++ {
 		fieldType := typ.Field(i)
-		ident, attr, fieldErr := parseAttrField(fieldType)
+		attr, fieldErr := parseAttrField(fieldType)
 		if fieldErr != nil {
 			err = fieldErr
 			return
 		}
 		attr.Index = i
-		attrFields[ident] = attr
+		attrFields = append(attrFields, attr)
 	}
 	model.AttrFields = attrFields
 	return
 }
 
-func parseAttrField(field reflect.StructField) (ident Ident, attr AttrFieldModel, err error) {
+func parseAttrField(field reflect.StructField) (attr AttrFieldModel, err error) {
 	tag, ok := field.Tag.Lookup("attr")
 	if !ok {
 		return
 	}
-	ident, attr, err = parseAttrTag(tag)
+	attr, err = parseAttrTag(tag)
 	if err != nil {
 		return
 	}
 	attr.FieldType = field.Type
-	if ident == sys.DbId {
+	if attr.Ident == sys.DbId {
 		return
 	}
 	switch field.Type.Kind() {
@@ -139,9 +141,9 @@ func parseAttrField(field reflect.StructField) (ident Ident, attr AttrFieldModel
 	return
 }
 
-func parseAttrTag(tag string) (ident Ident, attr AttrFieldModel, err error) {
+func parseAttrTag(tag string) (attr AttrFieldModel, err error) {
 	parts := strings.Split(tag, ",")
-	ident = Ident(parts[0])
+	attr.Ident = Ident(parts[0])
 	n := len(parts)
 	for i := 1; i < n; i++ {
 		part := parts[i]
