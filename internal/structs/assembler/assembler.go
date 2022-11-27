@@ -6,7 +6,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/dball/destructive/internal/structs/attrs"
 	"github.com/dball/destructive/internal/structs/models"
 	"github.com/dball/destructive/internal/sys"
 	. "github.com/dball/destructive/internal/types"
@@ -21,11 +20,6 @@ type Fact struct {
 	E ID
 	A Ident
 	V Value
-}
-
-type indexedAttrTag struct {
-	attrs.AttrTag
-	i int
 }
 
 type mapAwaitingEntry struct {
