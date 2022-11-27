@@ -18,6 +18,19 @@ type StructModel struct {
 	AttrFields []AttrFieldModel
 }
 
+// Attr returns the attribute field model with the given ident, if any.
+func (model StructModel) Attr(ident Ident) (attr AttrFieldModel, ok bool) {
+	// TODO could index these by ident
+	for _, a := range model.AttrFields {
+		if a.Ident == ident {
+			attr = a
+			ok = true
+			break
+		}
+	}
+	return
+}
+
 // AttrFieldModel models a field bound to an attribute.
 type AttrFieldModel struct {
 	// Ident is the ident of the attr.

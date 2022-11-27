@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dball/destructive/internal/structs/attrs"
+	"github.com/dball/destructive/internal/structs/models"
 	"github.com/dball/destructive/internal/sys"
 	. "github.com/dball/destructive/internal/types"
 )
@@ -106,24 +107,10 @@ func (a *assembler[T]) assembleAll() (err error) {
 func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 	value := ptr.Elem()
 
-	typ := value.Type()
-	if typ.Kind() != reflect.Struct {
-		err = NewError("assembler.notStruct", "type", typ)
+	model, modelErr := models.Analyze(value.Type())
+	if modelErr != nil {
+		err = modelErr
 		return
-	}
-	// TODO the assembler should cache these
-	n := typ.NumField()
-	attrTags := make(map[Ident]indexedAttrTag, n)
-	for i := 0; i < n; i++ {
-		field := typ.Field(i)
-		attrTag, attrErr := attrs.ParseAttrField(field)
-		if attrErr != nil {
-			err = attrErr
-			return
-		}
-		if attrTag.Ident != "" {
-			attrTags[attrTag.Ident] = indexedAttrTag{AttrTag: attrTag, i: i}
-		}
 	}
 
 	offset := sort.Search(len(a.facts), func(i int) bool { return a.facts[i].E >= id })
@@ -134,19 +121,19 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 			break
 		}
 		if i == offset {
-			attrTag, ok := attrTags[Ident(sys.DbId)]
+			attr, ok := model.Attr(Ident(sys.DbId))
 			if ok {
-				field := value.Field(attrTag.i)
+				field := value.Field(attr.Index)
 				field.SetUint(uint64(id))
 			}
 		}
-		attrTag, ok := attrTags[fact.A]
+		attr, ok := model.Attr(fact.A)
 		if !ok {
 			// We don't care if we get a fact with no field.
 			continue
 		}
-		field := value.Field(attrTag.i)
-		if attrTag.Pointer {
+		field := value.Field(attr.Index)
+		if attr.IsPointer() {
 			// TODO who owns the vs anyway? If they're not copied at some point,
 			// exposing value pointers opens the door to database corruption.
 			switch v := fact.V.(type) {
@@ -194,9 +181,9 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 				field.Set(reflect.ValueOf(time.Time(v)))
 			case ID:
 				switch {
-				case attrTag.Ident == sys.DbId:
+				case attr.Ident == sys.DbId:
 					field.SetUint(uint64(v))
-				case attrTag.MapKey != "":
+				case attr.MapKey != "":
 					if field.Kind() != reflect.Map {
 						err = NewError("assembler.invalidFactMapValue")
 						return
@@ -218,7 +205,7 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 					if !ok {
 						pointer = a.allocate(v, reflect.PointerTo(mapValueType))
 					}
-					a.addEntityToMap(attrTag.MapKey, m, v, pointer, mapHasPointers, ok)
+					a.addEntityToMap(attr.MapKey, m, v, pointer, mapHasPointers, ok)
 				default:
 					pointer, ok := a.pointers[v]
 					if ok {
