@@ -203,3 +203,42 @@ func TestMapWithPointerValues(t *testing.T) {
 	book = actual.Favs["The Actual Star"]
 	assert.Equal(t, Book{Title: "The Actual Star", Genre: "specfic"}, *book)
 }
+
+/*
+func TestSliceOfStructValues(t *testing.T) {
+	type Book struct {
+		Title string `attr:"book/title"`
+	}
+
+	type Person struct {
+		Name string `attr:"person/name"`
+		Favs []Book `attr:"person/favs"`
+	}
+
+	// TODO note this schema requires the referents can only be ranked by one referrer.
+	// One could imagine a ranking entity with refs to the referrer, the referent, and
+	// the rank as a value, but that would require bidirectional refs.
+	var p *Person
+	facts := []Fact{
+		{E: ID(1), A: Ident("person/name"), V: String("Donald")},
+		{E: ID(1), A: Ident("person/favs"), V: ID(2)},
+		{E: ID(1), A: Ident("person/favs"), V: ID(3)},
+		{E: ID(2), A: Ident("book/title"), V: String("Legendborn")},
+		{E: ID(2), A: Ident("sys/db/rank"), V: Int(1)},
+		{E: ID(3), A: Ident("book/title"), V: String("The Actual Star")},
+		{E: ID(3), A: Ident("sys/db/rank"), V: Int(0)},
+	}
+	assembler, err := NewAssembler(p, facts)
+	assert.NoError(t, err)
+	actual, err := assembler.Next()
+	assert.NoError(t, err)
+	expected := Person{
+		Name: "Donald",
+		Favs: []Book{
+			{Title: "The Actual Star"},
+			{Title: "Legendborn"},
+		},
+	}
+	assert.Equal(t, expected, actual)
+}
+*/

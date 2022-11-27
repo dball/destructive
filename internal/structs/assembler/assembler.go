@@ -106,8 +106,12 @@ func (a *assembler[T]) assembleAll() (err error) {
 func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 	value := ptr.Elem()
 
-	// TODO the assembler should cache these
 	typ := value.Type()
+	if typ.Kind() != reflect.Struct {
+		err = NewError("assembler.notStruct", "type", typ)
+		return
+	}
+	// TODO the assembler should cache these
 	n := typ.NumField()
 	attrTags := make(map[Ident]indexedAttrTag, n)
 	for i := 0; i < n; i++ {
