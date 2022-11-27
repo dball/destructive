@@ -241,3 +241,35 @@ func TestSliceOfStructValues(t *testing.T) {
 	}
 	assert.Equal(t, expected, *actual)
 }
+
+func TestSliceOfScalarValues(t *testing.T) {
+	type Test struct {
+		Title  string    `attr:"test/title"`
+		Scores []float64 `attr:"test/scores,value=test/score"`
+	}
+
+	var x *Test
+	facts := []Fact{
+		{E: ID(1), A: Ident("test/title"), V: String("Algebra II")},
+		{E: ID(1), A: Ident("test/scores"), V: ID(2)},
+		{E: ID(1), A: Ident("test/scores"), V: ID(3)},
+		{E: ID(1), A: Ident("test/scores"), V: ID(4)},
+		{E: ID(2), A: Ident("test/score"), V: Float(95.3)},
+		{E: ID(2), A: Ident("sys/db/rank"), V: Int(0)},
+		{E: ID(3), A: Ident("test/score"), V: Float(92.0)},
+		{E: ID(3), A: Ident("sys/db/rank"), V: Int(1)},
+		{E: ID(4), A: Ident("test/score"), V: Float(98.9)},
+		{E: ID(4), A: Ident("sys/db/rank"), V: Int(2)},
+	}
+	assembler, err := NewAssembler(x, facts)
+	assert.NoError(t, err)
+	actual, err := assembler.Next()
+	assert.NoError(t, err)
+	assert.NotNil(t, actual)
+	expected := Test{
+		Title: "Algebra II",
+		// we're pretending order is important here, e.g. tests repeatedly taken over time
+		Scores: []float64{95.3, 92.0, 98.9},
+	}
+	assert.Equal(t, expected, *actual)
+}
