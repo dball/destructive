@@ -29,6 +29,12 @@ type mapAwaitingEntry struct {
 	mapHasPointers bool
 }
 
+type sliceAwaitingEntry struct {
+	collValue Ident
+	slice     reflect.Value
+	pointer   reflect.Value
+}
+
 type assembler[T any] struct {
 	// base is a (nil) pointer to a struct of the root entity type
 	base *T
@@ -42,6 +48,8 @@ type assembler[T any] struct {
 	unprocessed map[ID]reflect.Value
 	// mapsAwaitingEntries are maps in entity struct fields awaiting referent entities to be realized
 	mapsAwaitingEntries map[ID][]mapAwaitingEntry
+	// slicesAwaitingEntries are slices in entity struct fields awaiting referent entities to be realized
+	slicesAwaitingEntries map[ID][]sliceAwaitingEntry
 }
 
 func NewAssembler[T any](base *T, facts []Fact) (a *assembler[T], err error) {
@@ -52,12 +60,13 @@ func NewAssembler[T any](base *T, facts []Fact) (a *assembler[T], err error) {
 	}
 	// TODO test that the pointer value type is a struct
 	a = &assembler[T]{
-		base:                base,
-		facts:               facts,
-		instances:           map[ID]*T{},
-		pointers:            map[ID]reflect.Value{},
-		unprocessed:         map[ID]reflect.Value{},
-		mapsAwaitingEntries: map[ID][]mapAwaitingEntry{},
+		base:                  base,
+		facts:                 facts,
+		instances:             map[ID]*T{},
+		pointers:              map[ID]reflect.Value{},
+		unprocessed:           map[ID]reflect.Value{},
+		mapsAwaitingEntries:   map[ID][]mapAwaitingEntry{},
+		slicesAwaitingEntries: map[ID][]sliceAwaitingEntry{},
 	}
 	return a, err
 }
@@ -177,17 +186,20 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 				switch {
 				case attr.Ident == sys.DbId:
 					field.SetUint(uint64(v))
-				case attr.MapKey != "":
-					if field.Kind() != reflect.Map {
-						err = NewError("assembler.invalidFactMapValue")
-						return
-					}
+				case attr.IsMap():
 					var m reflect.Value
 					if field.IsNil() {
-						m = reflect.MakeMap(field.Type())
+						n := 1
+						for j := i + 1; j < total; j++ {
+							f := a.facts[j]
+							if f.E != fact.E || f.A != fact.A {
+								break
+							}
+							n++
+						}
+						m = reflect.MakeMapWithSize(field.Type(), n)
 						field.Set(m)
 					} else {
-						// TODO is this right? it feels weird.
 						m = field
 					}
 					mapValueType := m.Type().Elem()
@@ -200,6 +212,28 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 						pointer = a.allocate(v, reflect.PointerTo(mapValueType))
 					}
 					a.addEntityToMap(attr.MapKey, m, v, pointer, mapHasPointers, ok)
+				case attr.IsSlice():
+					var slice reflect.Value
+					if field.IsNil() {
+						n := 1
+						for j := i + 1; j < total; j++ {
+							f := a.facts[j]
+							if f.E != fact.E || f.A != fact.A {
+								break
+							}
+							n++
+						}
+						slice = reflect.MakeSlice(field.Type(), n, n)
+						field.Set(slice)
+					} else {
+						slice = field
+					}
+					sliceValueType := slice.Type().Elem()
+					pointer, ok := a.pointers[v]
+					if !ok {
+						pointer = a.allocate(v, reflect.PointerTo(sliceValueType))
+					}
+					a.addEntityToSlice(attr.CollValue, slice, v, pointer, ok)
 				default:
 					pointer, ok := a.pointers[v]
 					if ok {
@@ -222,6 +256,13 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 			a.addEntityToMap(mae.mapKey, mae.m, id, mae.pointer, mae.mapHasPointers, true)
 		}
 		delete(a.mapsAwaitingEntries, id)
+	}
+	saes, ok := a.slicesAwaitingEntries[id]
+	if ok {
+		for _, sae := range saes {
+			a.addEntityToSlice(sae.collValue, sae.slice, id, sae.pointer, true)
+		}
+		delete(a.slicesAwaitingEntries, id)
 	}
 	instance, ok := ptr.Interface().(*T)
 	if ok {
@@ -291,6 +332,24 @@ func (a *assembler[T]) addEntityToMap(mapKey Ident, m reflect.Value, id ID, poin
 	} else {
 		maes = append(maes, mae)
 		a.mapsAwaitingEntries[id] = maes
+	}
+}
+
+func (a *assembler[T]) addEntityToSlice(collValue Ident, slice reflect.Value, id ID, pointer reflect.Value, immediate bool) {
+	if immediate {
+		value := pointer.Elem()
+		index := a.findValue(id, Ident("sys/db/rank"))
+		i := int(index.(int64))
+		slice.Index(i).Set(value)
+		return
+	}
+	sae := sliceAwaitingEntry{collValue, slice, pointer}
+	saes, ok := a.slicesAwaitingEntries[id]
+	if !ok {
+		a.slicesAwaitingEntries[id] = []sliceAwaitingEntry{sae}
+	} else {
+		saes = append(saes, sae)
+		a.slicesAwaitingEntries[id] = saes
 	}
 }
 

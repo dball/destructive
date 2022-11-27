@@ -204,7 +204,6 @@ func TestMapWithPointerValues(t *testing.T) {
 	assert.Equal(t, Book{Title: "The Actual Star", Genre: "specfic"}, *book)
 }
 
-/*
 func TestSliceOfStructValues(t *testing.T) {
 	type Book struct {
 		Title string `attr:"book/title"`
@@ -232,6 +231,7 @@ func TestSliceOfStructValues(t *testing.T) {
 	assert.NoError(t, err)
 	actual, err := assembler.Next()
 	assert.NoError(t, err)
+	assert.NotNil(t, actual)
 	expected := Person{
 		Name: "Donald",
 		Favs: []Book{
@@ -239,6 +239,5 @@ func TestSliceOfStructValues(t *testing.T) {
 			{Title: "Legendborn"},
 		},
 	}
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, *actual)
 }
-*/
