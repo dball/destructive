@@ -185,7 +185,7 @@ type Pet struct {
 Slices will be recorded and presented in order by introducing the system-managed `db/sys/rank` attribute. Sliced collections are assumed to be complete when recording, and will therefore
 retract any extant entries other than those given in the record.
 
-Struct slices have pointer values, though nils are not allowed when recording.
+Since the parent's ranking recorded on the child entity, the ref relationship must be dependent, and when recording, the child entities may not have any unique identifiers.
 
 Slices of scalars are also allowed:
 
