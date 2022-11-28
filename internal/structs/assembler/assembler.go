@@ -228,12 +228,20 @@ func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 					} else {
 						slice = field
 					}
-					sliceValueType := slice.Type().Elem()
-					pointer, ok := a.pointers[v]
-					if !ok {
-						pointer = a.allocate(v, reflect.PointerTo(sliceValueType))
+					if attr.CollValue == "" {
+						sliceValueType := slice.Type().Elem()
+						pointer, ok := a.pointers[v]
+						if !ok {
+							pointer = a.allocate(v, reflect.PointerTo(sliceValueType))
+						}
+						a.addEntityToSlice(attr.CollValue, slice, v, pointer, ok)
+					} else {
+						// Since we have exactly two facts to find, we can reasonably just go right to them,
+						// though we may want to mark the entity id as processed now.
+						scalar := a.findValue(v, attr.CollValue)
+						i := int(a.findValue(v, Ident("sys/db/rank")).(int64))
+						slice.Index(i).Set(reflect.ValueOf(scalar))
 					}
-					a.addEntityToSlice(attr.CollValue, slice, v, pointer, ok)
 				default:
 					pointer, ok := a.pointers[v]
 					if ok {

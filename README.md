@@ -19,13 +19,12 @@ Destructive is an experiment in indexed data storage in Golang, specifically foc
 
 * [x] Rewrite iterator with generics
 * [x] Rewrite types and system datums
-* [ ] Write robust shredder to extract datums from (graphs of) structs
-  * [ ] slices of pointers to scalars and structs
-  * [ ] map values of pointers to scalars and structs
+* [x] Write robust shredder to extract datums from (graphs of) structs
   * [ ] map keys that are not reflected in their values
   * [ ] retract (av?) extant map and slice datums when asserting
   * [ ] declare dependent refs
-* [ ] Write robust assembler to construct a struct from an iterator of datums
+  * [ ] declare schema
+* [x] Write robust assembler
 * [ ] Rewrite b-tree indexes with datum generics
 * [ ] Rewrite database/connect/view atop indexes
 * [ ] Experiment with struct query objects
