@@ -39,7 +39,18 @@ func Analyze(typ reflect.Type) (claims []Claim, err error) {
 				if field.IsMap() || field.IsSlice() {
 					typeClaims = append(typeClaims, Claim{E: e, A: sys.AttrCardinality, V: sys.AttrCardinalityMany})
 				}
-				// TODO if it's a ref field, analyze the ref type
+				switch {
+				case field.Type == sys.AttrTypeRef:
+					structField := typ.Field(field.Index)
+					fieldType := structField.Type
+					if field.IsPointer() {
+						fieldType = fieldType.Elem()
+					}
+					_, ok := done[fieldType]
+					if !ok {
+						todo[fieldType] = Void{}
+					}
+				}
 			}
 			claims = append(claims, typeClaims...)
 			done[typ] = Void{}
