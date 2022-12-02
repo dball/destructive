@@ -39,12 +39,31 @@ func Analyze(typ reflect.Type) (claims []Claim, err error) {
 				if field.IsMap() || field.IsSlice() {
 					typeClaims = append(typeClaims, Claim{E: e, A: sys.AttrCardinality, V: sys.AttrCardinalityMany})
 				}
-				switch {
-				case field.Type == sys.AttrTypeRef:
+				if field.Type == sys.AttrTypeRef {
 					structField := typ.Field(field.Index)
 					fieldType := structField.Type
-					if field.IsPointer() {
+					switch {
+					case field.IsPointer():
 						fieldType = fieldType.Elem()
+					case field.IsMap():
+						// TODO what if the map key is not featured in the struct value fields tho
+						fieldType = fieldType.Elem()
+						if fieldType.Kind() == reflect.Pointer {
+							fieldType = fieldType.Elem()
+						}
+					case field.IsSlice():
+						if field.CollValue != "" {
+							ee := TempID(strconv.FormatUint(uint64(nextID), 10))
+							nextID++
+							collAttrType := models.AttrTypeForScalarKind(fieldType.Elem())
+							typeClaims = append(typeClaims,
+								Claim{E: ee, A: sys.DbIdent, V: String(field.CollValue)},
+								Claim{E: ee, A: sys.AttrType, V: collAttrType},
+							)
+							continue
+						} else {
+							fieldType = fieldType.Elem()
+						}
 					}
 					_, ok := done[fieldType]
 					if !ok {

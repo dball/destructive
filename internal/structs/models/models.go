@@ -93,6 +93,24 @@ func Analyze(typ reflect.Type) (model StructModel, err error) {
 	return
 }
 
+func AttrTypeForScalarKind(typ reflect.Type) (attrType ID) {
+	switch typ.Kind() {
+	case reflect.Bool:
+		attrType = sys.AttrTypeBool
+	case reflect.Int:
+		attrType = sys.AttrTypeInt
+	case reflect.String:
+		attrType = sys.AttrTypeString
+	case reflect.Float64:
+		attrType = sys.AttrTypeFloat
+	case reflect.Struct:
+		if TimeType == typ {
+			attrType = sys.AttrTypeInst
+		}
+	}
+	return
+}
+
 func parseAttrField(field reflect.StructField) (attr AttrFieldModel, err error) {
 	tag, ok := field.Tag.Lookup("attr")
 	if !ok {
@@ -122,12 +140,12 @@ func parseAttrField(field reflect.StructField) (attr AttrFieldModel, err error) 
 			attr.Type = sys.AttrTypeRef
 		}
 	case reflect.Map:
-		attr.Type = sys.AttrRefType
+		attr.Type = sys.AttrTypeRef
 		if attr.MapKey == "" {
 			attr.MapKey = Ident(sys.DbId)
 		}
 	case reflect.Slice:
-		attr.Type = sys.AttrRefType
+		attr.Type = sys.AttrTypeRef
 	case reflect.Pointer:
 		// This repeats the outer switch, but without the pointer, map or slice cases.
 		switch field.Type.Elem().Kind() {
