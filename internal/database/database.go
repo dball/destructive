@@ -9,10 +9,7 @@ import (
 )
 
 type indexDatabase struct {
-	stringEAVIndex index.Index[string]
-	intEAVIndex    index.Index[int64]
-	uintEAVIndex   index.Index[uint64]
-	floatEAVIndex  index.Index[float64]
+	eav *index.CompositeIndex
 
 	attrsByID    map[ID]Attr
 	attrsByIdent map[Ident]Attr
@@ -24,12 +21,9 @@ var _ Database = (*indexDatabase)(nil)
 
 func NewIndexDatabase(degree int, attrsSize int) Database {
 	return &indexDatabase{
-		stringEAVIndex: index.NewBTreeIndex(degree, index.LessEAV[string]),
-		intEAVIndex:    index.NewBTreeIndex(degree, index.LessEAV[int64]),
-		uintEAVIndex:   index.NewBTreeIndex(degree, index.LessEAV[uint64]),
-		floatEAVIndex:  index.NewBTreeIndex(degree, index.LessEAV[float64]),
-		attrsByID:      make(map[ID]Attr, attrsSize),
-		attrsByIdent:   make(map[Ident]Attr, attrsSize),
+		eav:          index.NewCompositeIndex(degree, index.EAVIndex),
+		attrsByID:    make(map[ID]Attr, attrsSize),
+		attrsByIdent: make(map[Ident]Attr, attrsSize),
 	}
 }
 
