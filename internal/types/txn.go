@@ -88,7 +88,13 @@ type Request struct {
 type Transaction struct {
 	ID       ID
 	NewIDs   map[TempID]ID
-	Database Database
+	Snapshot Snapshot
 }
 
-type Database interface{}
+type Database interface {
+	Read() Snapshot
+	Write(req Request) Transaction
+}
+
+type Snapshot interface {
+}
