@@ -17,12 +17,18 @@ type TypedDatum[X constraints.Ordered] struct {
 	T ID
 }
 
-// Index instances maintain sorted sets of typed datums.
+// Index instances maintain sorted sets of typed datums. Indexes are safe for concurrent read
+// operations but may not be safe for concurrent write operations, including cloning.
 type Index[X constraints.Ordered] interface {
 	// Find returns true if the given datum is in the index.
 	Find(datum TypedDatum[X]) (extant bool)
 	// Insert ensures the given datum is present in the index, returning true if it was already.
 	Insert(datum TypedDatum[X]) (extant bool)
+	// Delete ensures the given datum is not present in the index, returning true if it was.
+	Delete(datum TypedDatum[X]) (extant bool)
+	// Clone returns a copy of the index. Both the original and the clone may be changed hereafter
+	// without either affecting the other.
+	Clone() (clone Index[X])
 }
 
 type btreeIndex[X constraints.Ordered] struct {
@@ -52,4 +58,13 @@ func (index *btreeIndex[X]) Insert(datum TypedDatum[X]) (extant bool) {
 		index.tree.ReplaceOrInsert(datum)
 	}
 	return
+}
+
+func (index *btreeIndex[X]) Delete(datum TypedDatum[X]) (extant bool) {
+	_, extant = index.tree.Delete(datum)
+	return
+}
+
+func (index *btreeIndex[X]) Clone() (clone Index[X]) {
+	return &btreeIndex[X]{tree: index.tree.Clone()}
 }
