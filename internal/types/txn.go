@@ -1,6 +1,10 @@
 package types
 
-import "time"
+import (
+	"time"
+
+	"github.com/dball/destructive/internal/iterator"
+)
 
 // TempID is a value that will resolve to a system id when a claim is asserted.
 type TempID string
@@ -84,17 +88,30 @@ type Request struct {
 	TempIDs map[TempID]map[IDRef]Void
 }
 
-// Transaction is the result of successfully applying a request to the database.
-type Transaction struct {
-	ID       ID
-	NewIDs   map[TempID]ID
+// Response is the result of trying to apply a request to the database.
+type Response struct {
+	// ID is the id of the transaction which applied the datums.
+	ID ID
+	// NewIDS is a map of entity ids indexed by their referring tempids.
+	NewIDs map[TempID]ID
+	// Snapshot is the value of the database after applying the datums, or
+	// which rejected the datums.
 	Snapshot Snapshot
+	// Error describes why the datums could not be applied.
+	Error error
 }
 
+// Database is a mutable set of datums. Databases are safe for concurrent use.
 type Database interface {
+	// Read returns a snapshot of the current state of the database.
 	Read() Snapshot
-	Write(req Request) Transaction
+	// Write tries to apply the request to the database.
+	Write(req Request) Response
 }
 
+// Snapshot is an immutable set of datums. Snapshots are safe for concurrent use.
 type Snapshot interface {
+	// Select returns an iterator of datums matching the claim. Empty values in the
+	// claim's fields indicate all values will match.
+	Select(claim Claim) iterator.Iterator[Datum]
 }

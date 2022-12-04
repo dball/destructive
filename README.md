@@ -23,9 +23,9 @@ Destructive is an experiment in indexed data storage in Golang, specifically foc
   * [ ] map keys that are not reflected in their values
   * [ ] retract (av?) extant map and slice datums when asserting
   * [ ] declare dependent refs
-  * [ ] declare schema
+  * [x] declare schema
 * [x] Write robust assembler
-* [ ] Rewrite b-tree indexes with datum generics
+* [x] Rewrite b-tree indexes with datum generics
 * [ ] Rewrite database/connect/view atop indexes
 * [ ] Experiment with struct query objects
 
@@ -83,7 +83,7 @@ recommended to use paths for consistency.
 This identifies the type of value to which the attribute refers, one of:
 
 * `sys/attr/type/string`
-* `sys/attr/type/inst` a moment in time
+* `sys/attr/type/inst` a moment in time, recorded with millisecond precision
 * `sys/attr/type/int`
 * `sys/attr/type/float`
 * `sys/attr/type/ref` a reference to an entity

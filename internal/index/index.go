@@ -2,69 +2,131 @@
 package index
 
 import (
-	. "github.com/dball/destructive/internal/types"
-	"golang.org/x/exp/constraints"
+	"time"
 
-	"github.com/google/btree"
+	"github.com/dball/destructive/internal/sys"
+	. "github.com/dball/destructive/internal/types"
 )
 
-// TypedDatum represents a datum with a specific V type. These will use less memory than interface V types
-// and their values can be compared with an operator.
-type TypedDatum[X constraints.Ordered] struct {
-	E ID
-	A ID
-	V X
-	T ID
+// IndexType is a type of datum index, e.g. EAV.
+type IndexType struct {
+	StringLesser Lesser[string]
+	IntLesser    Lesser[int64]
+	UintLesser   Lesser[uint64]
+	FloatLesser  Lesser[float64]
 }
 
-// Index instances maintain sorted sets of typed datums. Indexes are safe for concurrent read
-// operations but may not be safe for concurrent write operations, including cloning.
-type Index[X constraints.Ordered] interface {
-	// Find returns true if the given datum is in the index.
-	Find(datum TypedDatum[X]) (extant bool)
-	// Insert ensures the given datum is present in the index, returning true if it was already.
-	Insert(datum TypedDatum[X]) (extant bool)
-	// Delete ensures the given datum is not present in the index, returning true if it was.
-	Delete(datum TypedDatum[X]) (extant bool)
-	// Clone returns a copy of the index. Both the original and the clone may be changed hereafter
-	// without either affecting the other.
-	Clone() (clone Index[X])
+// EAVIndex is the EAV index type.
+var EAVIndex = IndexType{
+	StringLesser: LessEAV[string],
+	IntLesser:    LessEAV[int64],
+	UintLesser:   LessEAV[uint64],
+	FloatLesser:  LessEAV[float64],
 }
 
-type btreeIndex[X constraints.Ordered] struct {
-	// TODO the struct isn't necessary or even desirable unless we have more things to say about
-	// our trees, but I could not express this as a generically typed type alias.
-	tree *btree.BTreeG[TypedDatum[X]]
+type Index interface {
+	Find(datum Datum) (extant bool)
+	Insert(datum Datum) (extant bool)
+	Delete(datum Datum) (extant bool)
+	Clone() (clone Index)
 }
 
-// NewBTreeIndex returns a btree index of the given degree that sorts its set of typed datums
-// according to the given lesser function, which returns true iff the first arg is less than
-// the second.
-func NewBTreeIndex[X constraints.Ordered](degree int, lesser Lesser[X]) (index Index[X]) {
-	index = &btreeIndex[X]{tree: btree.NewG(degree, btree.LessFunc[TypedDatum[X]](lesser))}
-	return
+// CompositeIndex is an index of indexes of the discrete types.
+type CompositeIndex struct {
+	attrTypes map[ID]ID
+	strings   TypedIndex[string]
+	ints      TypedIndex[int64]
+	uints     TypedIndex[uint64]
+	floats    TypedIndex[float64]
 }
 
-func (index *btreeIndex[X]) Find(datum TypedDatum[X]) (found bool) {
-	found = index.tree.Has(datum)
-	return
-}
+var _ Index = &CompositeIndex{}
 
-func (index *btreeIndex[X]) Insert(datum TypedDatum[X]) (extant bool) {
-	extant = index.Find(datum)
-	if !extant {
-		// We would use this directly for efficiency, but this overwrites an extant value,
-		// while we choose to retain it, preferring the earliest T value introducing a datum.
-		index.tree.ReplaceOrInsert(datum)
+// NewCompositeIndex returns a new composite index of the given degree and type.
+func NewCompositeIndex(degree int, indexType IndexType, attrTypes map[ID]ID) (composite *CompositeIndex) {
+	composite = &CompositeIndex{
+		attrTypes: attrTypes,
+		strings:   NewBTreeIndex(degree, indexType.StringLesser),
+		ints:      NewBTreeIndex(degree, indexType.IntLesser),
+		uints:     NewBTreeIndex(degree, indexType.UintLesser),
+		floats:    NewBTreeIndex(degree, indexType.FloatLesser),
 	}
 	return
 }
 
-func (index *btreeIndex[X]) Delete(datum TypedDatum[X]) (extant bool) {
-	_, extant = index.tree.Delete(datum)
+func (idx *CompositeIndex) Find(datum Datum) (extant bool) {
+	switch idx.attrTypes[datum.A] {
+	case sys.AttrTypeString:
+		extant = idx.strings.Find(TypedDatum[string]{E: datum.E, A: datum.A, V: string(datum.V.(String))})
+	case sys.AttrTypeInt:
+		extant = idx.ints.Find(TypedDatum[int64]{E: datum.E, A: datum.A, V: int64(datum.V.(Int))})
+	case sys.AttrTypeRef:
+		extant = idx.uints.Find(TypedDatum[uint64]{E: datum.E, A: datum.A, V: uint64(datum.V.(ID))})
+	case sys.AttrTypeFloat:
+		extant = idx.floats.Find(TypedDatum[float64]{E: datum.E, A: datum.A, V: float64(datum.V.(Float))})
+	case sys.AttrTypeBool:
+		if bool(datum.V.(Bool)) {
+			extant = idx.uints.Find(TypedDatum[uint64]{E: datum.E, A: datum.A, V: 1})
+		} else {
+			extant = idx.uints.Find(TypedDatum[uint64]{E: datum.E, A: datum.A, V: 0})
+		}
+	case sys.AttrTypeInst:
+		extant = idx.ints.Find(TypedDatum[int64]{E: datum.E, A: datum.A, V: time.Time(datum.V.(Inst)).UnixMilli()})
+	}
 	return
 }
 
-func (index *btreeIndex[X]) Clone() (clone Index[X]) {
-	return &btreeIndex[X]{tree: index.tree.Clone()}
+func (idx *CompositeIndex) Insert(datum Datum) (extant bool) {
+	switch idx.attrTypes[datum.A] {
+	case sys.AttrTypeString:
+		extant = idx.strings.Insert(TypedDatum[string]{E: datum.E, A: datum.A, V: string(datum.V.(String))})
+	case sys.AttrTypeInt:
+		extant = idx.ints.Insert(TypedDatum[int64]{E: datum.E, A: datum.A, V: int64(datum.V.(Int))})
+	case sys.AttrTypeRef:
+		extant = idx.uints.Insert(TypedDatum[uint64]{E: datum.E, A: datum.A, V: uint64(datum.V.(ID))})
+	case sys.AttrTypeFloat:
+		extant = idx.floats.Insert(TypedDatum[float64]{E: datum.E, A: datum.A, V: float64(datum.V.(Float))})
+	case sys.AttrTypeBool:
+		if bool(datum.V.(Bool)) {
+			extant = idx.uints.Insert(TypedDatum[uint64]{E: datum.E, A: datum.A, V: 1})
+		} else {
+			extant = idx.uints.Insert(TypedDatum[uint64]{E: datum.E, A: datum.A, V: 0})
+		}
+	case sys.AttrTypeInst:
+		extant = idx.ints.Insert(TypedDatum[int64]{E: datum.E, A: datum.A, V: time.Time(datum.V.(Inst)).UnixMilli()})
+	}
+	return
+}
+
+func (idx *CompositeIndex) Delete(datum Datum) (extant bool) {
+	switch idx.attrTypes[datum.A] {
+	case sys.AttrTypeString:
+		extant = idx.strings.Delete(TypedDatum[string]{E: datum.E, A: datum.A, V: string(datum.V.(String))})
+	case sys.AttrTypeInt:
+		extant = idx.ints.Delete(TypedDatum[int64]{E: datum.E, A: datum.A, V: int64(datum.V.(Int))})
+	case sys.AttrTypeRef:
+		extant = idx.uints.Delete(TypedDatum[uint64]{E: datum.E, A: datum.A, V: uint64(datum.V.(ID))})
+	case sys.AttrTypeFloat:
+		extant = idx.floats.Delete(TypedDatum[float64]{E: datum.E, A: datum.A, V: float64(datum.V.(Float))})
+	case sys.AttrTypeBool:
+		if bool(datum.V.(Bool)) {
+			extant = idx.uints.Delete(TypedDatum[uint64]{E: datum.E, A: datum.A, V: 1})
+		} else {
+			extant = idx.uints.Delete(TypedDatum[uint64]{E: datum.E, A: datum.A, V: 0})
+		}
+	case sys.AttrTypeInst:
+		extant = idx.ints.Delete(TypedDatum[int64]{E: datum.E, A: datum.A, V: time.Time(datum.V.(Inst)).UnixMilli()})
+	}
+	return
+}
+
+func (idx *CompositeIndex) Clone() (clone Index) {
+	clone = &CompositeIndex{
+		attrTypes: idx.attrTypes,
+		strings:   idx.strings.Clone(),
+		ints:      idx.ints.Clone(),
+		uints:     idx.uints.Clone(),
+		floats:    idx.floats.Clone(),
+	}
+	return
 }
