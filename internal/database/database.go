@@ -12,11 +12,16 @@ import (
 
 type indexDatabase struct {
 	eav index.Index
+	aev index.Index
+	ave index.Index
+	vae index.Index
 
 	attrsByID    map[ID]Attr
 	attrsByIdent map[Ident]Attr
 	attrTypes    map[ID]ID
 	idents       map[Ident]ID
+	uniqueAttrs  map[ID]Void
+	refAttrs     map[ID]Void
 
 	lock   sync.RWMutex
 	nextID ID
@@ -30,20 +35,32 @@ func NewIndexDatabase(degree int, attrsSize int, identsSize int) (db Database) {
 	attrsByIdent := make(map[Ident]Attr, attrsSize)
 	attrTypes := make(map[ID]ID, attrsSize)
 	idents := make(map[Ident]ID, identsSize)
+	uniqueAttrs := make(map[ID]Void, attrsSize)
+	refAttrs := make(map[ID]Void, attrsSize)
 	for id, attr := range sys.Attrs {
 		attrsByID[id] = attr
 		attrsByIdent[attr.Ident] = attr
 		attrTypes[id] = attr.Type
+		if attr.Unique != 0 {
+			uniqueAttrs[id] = Void{}
+		}
+		if attr.Type == sys.AttrTypeRef {
+			refAttrs[id] = Void{}
+		}
 	}
 	for ident, id := range sys.Idents {
 		idents[ident] = id
 	}
 	db = &indexDatabase{
 		eav:          index.NewCompositeIndex(degree, index.EAVIndex, attrTypes),
+		aev:          index.NewCompositeIndex(degree, index.AEVIndex, attrTypes),
+		ave:          index.NewCompositeIndex(degree, index.AVEIndex, attrTypes),
+		vae:          index.NewCompositeIndex(degree, index.VAEIndex, attrTypes),
 		attrsByID:    attrsByID,
 		attrsByIdent: attrsByIdent,
 		attrTypes:    attrTypes,
 		idents:       idents,
+		uniqueAttrs:  uniqueAttrs,
 		nextID:       sys.FirstUserID,
 	}
 	return
@@ -68,6 +85,11 @@ func (db *indexDatabase) Write(req Request) (res Response) {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 	eav := db.eav.Clone()
+	aev := db.aev.Clone()
+	// TODO could defer this clone until we know we need it
+	ave := db.aev.Clone()
+	// TODO could defer this cloen until we know we need it
+	vae := db.vae.Clone()
 	t := db.allocateID()
 CLAIMS:
 	for _, claim := range req.Claims {
@@ -127,13 +149,68 @@ CLAIMS:
 			break CLAIMS
 		}
 		switch v := claim.V.(type) {
-		case String:
-			datum.V = v
+		case Ident:
+			found := false
+			datum.V, found = db.idents[v]
+			if !found {
+				res.Error = NewError("database.write.invalidV", "v", v)
+				break CLAIMS
+			}
+		case TempID:
+			id := res.NewIDs[v]
+			if id == 0 {
+				// TODO is it okay if there are no claim e's that correspond to this?
+				id = db.allocateID()
+				res.NewIDs[v] = id
+			}
+			datum.V = id
+		case LookupRef:
+			id := db.resolveLookupRef(v)
+			if id == 0 {
+				res.Error = NewError("database.write.invalidV", "v", v)
+				break CLAIMS
+			}
+			datum.V = id
 		default:
-			res.Error = NewError("database.write.invalidV", "v", v)
-			break CLAIMS
+			ok := false
+			// TODO we could make ourselves a typed datum right here if we want to commit to that
+			// instead of the composite index abstraction, avoiding an intermediate struct thereby.
+			datum.V, ok = v.(Value)
+			if !ok {
+				res.Error = NewError("database.write.invalidV", "v", v)
+				break CLAIMS
+			}
 		}
-		eav.Insert(datum)
+		// TODO we could datums into the indexes concurrently after we have resolved all datums
+		if !claim.Retract {
+			eav.Insert(datum)
+			aev.Insert(datum)
+			ok := false
+			_, ok = db.refAttrs[datum.A]
+			if ok {
+				ave.Insert(datum)
+				vae.Insert(datum)
+			} else {
+				_, ok = db.uniqueAttrs[datum.A]
+				if ok {
+					ave.Insert(datum)
+				}
+			}
+		} else {
+			eav.Delete(datum)
+			aev.Delete(datum)
+			ok := false
+			_, ok = db.refAttrs[datum.A]
+			if ok {
+				ave.Delete(datum)
+				vae.Delete(datum)
+			} else {
+				_, ok = db.uniqueAttrs[datum.A]
+				if ok {
+					ave.Delete(datum)
+				}
+			}
+		}
 	}
 	if res.Error != nil {
 		db.nextID = res.ID
@@ -141,6 +218,9 @@ CLAIMS:
 	} else {
 		res.ID = t
 		db.eav = eav
+		db.aev = aev
+		db.ave = ave
+		db.vae = vae
 	}
 	res.Snapshot = db.read()
 	return

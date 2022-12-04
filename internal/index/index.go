@@ -24,6 +24,30 @@ var EAVIndex = IndexType{
 	FloatLesser:  LessEAV[float64],
 }
 
+// AEVIndex is the AEV index type.
+var AEVIndex = IndexType{
+	StringLesser: LessAEV[string],
+	IntLesser:    LessAEV[int64],
+	UintLesser:   LessAEV[uint64],
+	FloatLesser:  LessAEV[float64],
+}
+
+// AVEIndex is the AVE index type.
+var AVEIndex = IndexType{
+	StringLesser: LessAVE[string],
+	IntLesser:    LessAVE[int64],
+	UintLesser:   LessAVE[uint64],
+	FloatLesser:  LessAVE[float64],
+}
+
+// VAEIndex is the VAE index type.
+var VAEIndex = IndexType{
+	StringLesser: LessVAE[string],
+	IntLesser:    LessVAE[int64],
+	UintLesser:   LessVAE[uint64],
+	FloatLesser:  LessVAE[float64],
+}
+
 type Index interface {
 	Find(datum Datum) (extant bool)
 	Insert(datum Datum) (extant bool)
