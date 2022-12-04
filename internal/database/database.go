@@ -74,17 +74,31 @@ CLAIMS:
 		datum := Datum{T: t}
 		switch e := claim.E.(type) {
 		case ID:
-			if e == 0 || e > t {
+			if e == 0 || e >= t {
 				res.Error = NewError("database.write.invalidE", "e", e)
 				break CLAIMS
 			}
 			datum.E = e
+		case Ident:
+			datum.E = db.idents[e]
+			if datum.E == 0 {
+				res.Error = NewError("database.write.invalidE", "e", e)
+				break CLAIMS
+			}
+		case LookupRef:
+			datum.E = db.resolveLookupRef(e)
+			if datum.E == 0 {
+				res.Error = NewError("database.write.invalidE", "e", e)
+				break CLAIMS
+			}
 		case TempID:
 			datum.E = res.NewIDs[e]
 			if datum.E == 0 {
 				datum.E = db.allocateID()
 				res.NewIDs[e] = datum.E
 			}
+		case TxnID:
+			datum.E = t
 		default:
 			res.Error = NewError("database.write.invalidE", "e", e)
 			break CLAIMS
@@ -96,6 +110,18 @@ CLAIMS:
 				break CLAIMS
 			}
 			datum.A = a
+		case Ident:
+			datum.A = db.idents[a]
+			if datum.A == 0 {
+				res.Error = NewError("database.write.invalidA", "a", a)
+				break CLAIMS
+			}
+		case LookupRef:
+			datum.A = db.resolveLookupRef(a)
+			if datum.A == 0 {
+				res.Error = NewError("database.write.invalidA", "a", a)
+				break CLAIMS
+			}
 		default:
 			res.Error = NewError("database.write.invalidA", "a", a)
 			break CLAIMS
@@ -123,6 +149,11 @@ CLAIMS:
 func (db *indexDatabase) allocateID() (id ID) {
 	id = db.nextID
 	db.nextID++
+	return
+}
+
+func (db *indexDatabase) resolveLookupRef(ref LookupRef) (id ID) {
+	// TODO need ave index
 	return
 }
 
