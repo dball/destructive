@@ -16,6 +16,7 @@ type indexDatabase struct {
 	attrsByID    map[ID]Attr
 	attrsByIdent map[Ident]Attr
 	attrTypes    map[ID]ID
+	idents       map[Ident]ID
 
 	lock   sync.RWMutex
 	nextID ID
@@ -23,21 +24,26 @@ type indexDatabase struct {
 
 var _ Database = (*indexDatabase)(nil)
 
-func NewIndexDatabase(degree int, attrsSize int) (db Database) {
+func NewIndexDatabase(degree int, attrsSize int, identsSize int) (db Database) {
 	attrsSize += len(sys.Attrs)
 	attrsByID := make(map[ID]Attr, attrsSize)
 	attrsByIdent := make(map[Ident]Attr, attrsSize)
 	attrTypes := make(map[ID]ID, attrsSize)
+	idents := make(map[Ident]ID, identsSize)
 	for id, attr := range sys.Attrs {
 		attrsByID[id] = attr
 		attrsByIdent[attr.Ident] = attr
 		attrTypes[id] = attr.Type
+	}
+	for ident, id := range sys.Idents {
+		idents[ident] = id
 	}
 	db = &indexDatabase{
 		eav:          index.NewCompositeIndex(degree, index.EAVIndex, attrTypes),
 		attrsByID:    attrsByID,
 		attrsByIdent: attrsByIdent,
 		attrTypes:    attrTypes,
+		idents:       idents,
 		nextID:       sys.FirstUserID,
 	}
 	return

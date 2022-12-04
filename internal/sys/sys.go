@@ -74,6 +74,26 @@ var Attrs map[ID]Attr = map[ID]Attr{
 	DbRank:          {ID: DbRank, Type: AttrTypeInt, Ident: Ident("sys/db/rank")},
 }
 
+// Idents could also be computed from Datums.
+var Idents map[Ident]ID = map[Ident]ID{
+	Ident("sys/db/ident"):                DbIdent,
+	Ident("sys/attr/unique"):             AttrUnique,
+	Ident("sys/tx/at"):                   TxAt,
+	Ident("sys/attr/type"):               AttrType,
+	Ident("sys/attr/type/ref"):           AttrTypeRef,
+	Ident("sys/attr/type/string"):        AttrTypeString,
+	Ident("sys/attr/type/inst"):          AttrTypeInst,
+	Ident("sys/attr/type/int"):           AttrTypeInt,
+	Ident("sys/attr/type/bool"):          AttrTypeBool,
+	Ident("sys/attr/type/float"):         AttrTypeFloat,
+	Ident("sys/attr/cardinality"):        AttrCardinality,
+	Ident("sys/attr/cardinality/one"):    AttrCardinalityOne,
+	Ident("sys/attr/cardinality/many"):   AttrCardinalityMany,
+	Ident("sys/attr/ref/type"):           AttrRefType,
+	Ident("sys/attr/ref/type/dependent"): AttrRefTypeDependent,
+	Ident("sys/db/rank"):                 DbRank,
+}
+
 func ValidValue(typ ID, value Value) (ok bool) {
 	switch typ {
 	case AttrTypeRef:

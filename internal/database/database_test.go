@@ -9,7 +9,7 @@ import (
 )
 
 func TestWriteSimple(t *testing.T) {
-	db := NewIndexDatabase(32, 4)
+	db := NewIndexDatabase(32, 64, 64)
 	req := Request{
 		Claims: []*Claim{
 			{E: TempID("1"), A: sys.DbIdent, V: String("test/ident")},
