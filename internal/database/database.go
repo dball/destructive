@@ -17,7 +17,8 @@ type indexDatabase struct {
 	attrsByIdent map[Ident]Attr
 	attrTypes    map[ID]ID
 
-	lock sync.RWMutex
+	lock   sync.RWMutex
+	nextID ID
 }
 
 var _ Database = (*indexDatabase)(nil)
@@ -37,6 +38,7 @@ func NewIndexDatabase(degree int, attrsSize int) (db Database) {
 		attrsByID:    attrsByID,
 		attrsByIdent: attrsByIdent,
 		attrTypes:    attrTypes,
+		nextID:       sys.FirstUserID,
 	}
 	return
 }
@@ -44,6 +46,11 @@ func NewIndexDatabase(degree int, attrsSize int) (db Database) {
 func (db *indexDatabase) Read() (snapshot Snapshot) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
+	snapshot = db.read()
+	return
+}
+
+func (db *indexDatabase) read() (snapshot Snapshot) {
 	snapshot = &indexSnapshot{
 		eav: db.eav.Clone(),
 	}
@@ -51,9 +58,60 @@ func (db *indexDatabase) Read() (snapshot Snapshot) {
 }
 
 func (db *indexDatabase) Write(req Request) (res Response) {
+	res.NewIDs = map[TempID]ID{}
 	db.lock.Lock()
 	defer db.lock.Unlock()
-	panic("TODO")
+	eav := db.eav.Clone()
+	t := db.allocateID()
+CLAIMS:
+	for _, claim := range req.Claims {
+		datum := Datum{T: t}
+		switch e := claim.E.(type) {
+		case ID:
+			if e == 0 || e > t {
+				res.Error = NewError("database.write.invalidE", "e", e)
+				break CLAIMS
+			}
+			datum.E = e
+		default:
+			res.Error = NewError("database.write.invalidE", "e", e)
+			break CLAIMS
+		}
+		switch a := claim.A.(type) {
+		case ID:
+			if a == 0 || a >= t {
+				res.Error = NewError("database.write.invalidA", "a", a)
+				break CLAIMS
+			}
+			datum.A = a
+		default:
+			res.Error = NewError("database.write.invalidA", "a", a)
+			break CLAIMS
+		}
+		switch v := claim.V.(type) {
+		case String:
+			datum.V = v
+		default:
+			res.Error = NewError("database.write.invalidV", "v", v)
+			break CLAIMS
+		}
+		eav.Insert(datum)
+	}
+	if res.Error != nil {
+		db.nextID = res.ID
+		res.NewIDs = nil
+	} else {
+		res.ID = t
+		db.eav = eav
+	}
+	res.Snapshot = db.read()
+	return
+}
+
+func (db *indexDatabase) allocateID() (id ID) {
+	id = db.nextID
+	db.nextID++
+	return
 }
 
 type indexSnapshot struct {
