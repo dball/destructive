@@ -73,6 +73,12 @@ CLAIMS:
 				break CLAIMS
 			}
 			datum.E = e
+		case TempID:
+			datum.E = res.NewIDs[e]
+			if datum.E == 0 {
+				datum.E = db.allocateID()
+				res.NewIDs[e] = datum.E
+			}
 		default:
 			res.Error = NewError("database.write.invalidE", "e", e)
 			break CLAIMS
