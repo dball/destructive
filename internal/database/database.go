@@ -52,9 +52,10 @@ func NewIndexDatabase(degree int, attrsSize int, identsSize int) (db Database) {
 		idents[ident] = id
 	}
 	db = &indexDatabase{
-		eav:          index.NewCompositeIndex(degree, index.EAVIndex, attrTypes),
-		aev:          index.NewCompositeIndex(degree, index.AEVIndex, attrTypes),
-		ave:          index.NewCompositeIndex(degree, index.AVEIndex, attrTypes),
+		eav: index.NewCompositeIndex(degree, index.EAVIndex, attrTypes),
+		aev: index.NewCompositeIndex(degree, index.AEVIndex, attrTypes),
+		ave: index.NewCompositeIndex(degree, index.AVEIndex, attrTypes),
+		// TODO vae will only ever need a uint typed index
 		vae:          index.NewCompositeIndex(degree, index.VAEIndex, attrTypes),
 		attrsByID:    attrsByID,
 		attrsByIdent: attrsByIdent,
@@ -180,6 +181,10 @@ CLAIMS:
 				res.Error = NewError("database.write.invalidV", "v", v)
 				break CLAIMS
 			}
+		}
+		if !sys.ValidValue(db.attrTypes[datum.A], datum.V) {
+			res.Error = NewError("database.write.inconsistentAV", "datum", datum)
+			break CLAIMS
 		}
 		// TODO we could datums into the indexes concurrently after we have resolved all datums
 		if !claim.Retract {
