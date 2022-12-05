@@ -24,6 +24,7 @@ func TestWriteSimple(t *testing.T) {
 }
 
 func TestWriteAttr(t *testing.T) {
+	t.Skip()
 	db := NewIndexDatabase(32, 64, 64)
 	req := Request{
 		Claims: []*Claim{
