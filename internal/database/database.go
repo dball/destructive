@@ -188,6 +188,7 @@ CLAIMS:
 		}
 		// TODO we could datums into the indexes concurrently after we have resolved all datums
 		if !claim.Retract {
+			// TODO if this is cardinality one, we must retract extant datum if ea but not v
 			eav.Insert(datum)
 			aev.Insert(datum)
 			ok := false
