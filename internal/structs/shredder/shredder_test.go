@@ -28,16 +28,11 @@ func TestShred(t *testing.T) {
 		assert.NoError(t, err)
 		expected := Request{
 			Claims: []*Claim{
-				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
-				{E: TempID("1"), A: Ident("person/age"), V: Int(48)},
-				{E: TempID("1"), A: Ident("person/birthdate"), V: Inst(epoch)},
+				{E: ID(23), A: Ident("person/name"), V: String("Donald")},
+				{E: ID(23), A: Ident("person/age"), V: Int(48)},
+				{E: ID(23), A: Ident("person/birthdate"), V: Inst(epoch)},
 			},
-			TempIDs: map[TempID]map[IDRef]Void{
-				TempID("1"): {
-					ID(23): Void{},
-					LookupRef{A: Ident("person/name"), V: String("Donald")}: Void{},
-				},
-			},
+			Retractions: []*Retraction{},
 		}
 		assert.Equal(t, expected, req)
 	})
@@ -48,11 +43,13 @@ func TestShred(t *testing.T) {
 		req, err := shredder.Shred(Document{Retractions: []any{p}})
 		assert.NoError(t, err)
 		expected := Request{
-			Claims: []*Claim{{E: TempID("1"), A: nil, V: nil, Retract: true}},
-			TempIDs: map[TempID]map[IDRef]Void{
-				TempID("1"): {
-					ID(23): Void{},
-					LookupRef{A: Ident("person/name"), V: String("Donald")}: Void{},
+			Claims: []*Claim{},
+			Retractions: []*Retraction{
+				{
+					Constraints: map[ERef]Void{
+						ID(23): {},
+						LookupRef{A: Ident("person/name"), V: String("Donald")}: {},
+					},
 				},
 			},
 		}
@@ -66,16 +63,10 @@ func TestShred(t *testing.T) {
 		assert.NoError(t, err)
 		expected := Request{
 			Claims: []*Claim{
-				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
-				{E: TempID("1"), A: Ident("person/uuid"), V: String("the-uuid")},
+				{E: ID(23), A: Ident("person/name"), V: String("Donald")},
+				{E: ID(23), A: Ident("person/uuid"), V: String("the-uuid")},
 			},
-			TempIDs: map[TempID]map[IDRef]Void{
-				TempID("1"): {
-					ID(23): Void{},
-					LookupRef{A: Ident("person/name"), V: String("Donald")}:   Void{},
-					LookupRef{A: Ident("person/uuid"), V: String("the-uuid")}: Void{},
-				},
-			},
+			Retractions: []*Retraction{},
 		}
 		assert.Equal(t, expected, req)
 	})
@@ -93,14 +84,9 @@ func TestShred(t *testing.T) {
 				{E: TempID("1"), A: Ident("person/pets"), V: Int(4)},
 				{E: TempID("1"), A: Ident("person/deathdate"), V: Inst(epoch)},
 			},
-			TempIDs: map[TempID]map[IDRef]Void{
-				TempID("1"): {
-					LookupRef{A: Ident("person/name"), V: String("Donald")}: Void{},
-				},
-			},
+			Retractions: []*Retraction{},
 		}
 		assert.Equal(t, expected, req)
-
 	})
 
 	t.Run("invalid values", func(t *testing.T) {
