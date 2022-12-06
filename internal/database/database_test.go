@@ -14,7 +14,6 @@ func TestWriteSimple(t *testing.T) {
 		Claims: []*Claim{
 			{E: TempID("1"), A: sys.DbIdent, V: String("test/ident")},
 		},
-		TempIDs: map[TempID]map[IDRef]Void{},
 	}
 	res := db.Write(req)
 	assert.NoError(t, res.Error)
@@ -32,7 +31,6 @@ func TestWriteAttr(t *testing.T) {
 			{E: TempID("1"), A: sys.AttrType, V: sys.AttrTypeString},
 			{E: TempID("1"), A: sys.AttrUnique, V: sys.AttrUniqueIdentity},
 		},
-		TempIDs: map[TempID]map[IDRef]Void{},
 	}
 	res := db.Write(req)
 	assert.NoError(t, res.Error)
@@ -44,7 +42,6 @@ func TestWriteAttr(t *testing.T) {
 		Claims: []*Claim{
 			{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 		},
-		TempIDs: map[TempID]map[IDRef]Void{},
 	}
 	res = db.Write(req)
 	assert.NoError(t, res.Error)

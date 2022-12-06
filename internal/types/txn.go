@@ -82,10 +82,11 @@ type Claim struct {
 	Retract bool
 }
 
-// Retraction is a retraction of an entity. The constraints must resolve to a
+// Retraction is a retraction of all attribute values for an entity as well as
+// all of its dependent references, recursively. The constraints must resolve to a
 // single id or the retraction is rejected.
 type Retraction struct {
-	Constraints map[ERef]Void
+	Constraints map[IDRef]Void
 }
 
 // Request is a set of claims and constraints on their temporary ids.
@@ -94,10 +95,6 @@ type Request struct {
 	Claims []*Claim
 	// The list of retractions.
 	Retractions []*Retraction
-	// The constraints on the tempids used in the request. This is primarily
-	// used to convey constraints that can't be expressed in an entity
-	// retraction claim and is now being deprecated in favor of retractions.
-	TempIDs map[TempID]map[IDRef]Void
 }
 
 // Response is the result of trying to apply a request to the database.
