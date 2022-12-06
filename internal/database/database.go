@@ -89,7 +89,7 @@ func (db *indexDatabase) Write(req Request) (res Response) {
 	aev := db.aev.Clone()
 	// TODO could defer this clone until we know we need it
 	ave := db.aev.Clone()
-	// TODO could defer this cloen until we know we need it
+	// TODO could defer this clone until we know we need it
 	vae := db.vae.Clone()
 	t := db.allocateID()
 CLAIMS:
@@ -186,9 +186,9 @@ CLAIMS:
 			res.Error = NewError("database.write.inconsistentAV", "datum", datum)
 			break CLAIMS
 		}
-		// TODO we could datums into the indexes concurrently after we have resolved all datums
+		// TODO we could transact datums into the indexes concurrently after we have resolved all claims
 		if !claim.Retract {
-			// TODO if this is cardinality one, we must retract extant datum if ea but not v
+			// TODO if this is cardinality one, we must replace extant datum if ea but not v
 			eav.Insert(datum)
 			aev.Insert(datum)
 			ok := false
