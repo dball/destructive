@@ -21,7 +21,6 @@ type indexDatabase struct {
 	attrTypes    map[ID]ID
 	idents       map[Ident]ID
 	uniqueAttrs  map[ID]Void
-	refAttrs     map[ID]Void
 
 	lock   sync.RWMutex
 	nextID ID
@@ -36,7 +35,6 @@ func NewIndexDatabase(degree int, attrsSize int, identsSize int) (db Database) {
 	attrTypes := make(map[ID]ID, attrsSize)
 	idents := make(map[Ident]ID, identsSize)
 	uniqueAttrs := make(map[ID]Void, attrsSize)
-	refAttrs := make(map[ID]Void, attrsSize)
 	for id, attr := range sys.Attrs {
 		attrsByID[id] = attr
 		attrsByIdent[attr.Ident] = attr
@@ -44,19 +42,32 @@ func NewIndexDatabase(degree int, attrsSize int, identsSize int) (db Database) {
 		if attr.Unique != 0 {
 			uniqueAttrs[id] = Void{}
 		}
-		if attr.Type == sys.AttrTypeRef {
-			refAttrs[id] = Void{}
-		}
 	}
 	for ident, id := range sys.Idents {
 		idents[ident] = id
 	}
+	eav := index.NewCompositeIndex(degree, index.EAVIndex, attrTypes)
+	aev := index.NewCompositeIndex(degree, index.AEVIndex, attrTypes)
+	ave := index.NewCompositeIndex(degree, index.AVEIndex, attrTypes)
+	// TODO vae will only ever need a uint typed index
+	vae := index.NewCompositeIndex(degree, index.VAEIndex, attrTypes)
+	// Bootstrap the system datums by writing to the appropriate indexes directly.
+	for _, datum := range sys.Datums {
+		eav.Insert(datum)
+		aev.Insert(datum)
+		_, ok := uniqueAttrs[datum.A]
+		if ok {
+			ave.Insert(datum)
+		}
+		if attrTypes[datum.A] == sys.AttrTypeRef {
+			vae.Insert(datum)
+		}
+	}
 	db = &indexDatabase{
-		eav: index.NewCompositeIndex(degree, index.EAVIndex, attrTypes),
-		aev: index.NewCompositeIndex(degree, index.AEVIndex, attrTypes),
-		ave: index.NewCompositeIndex(degree, index.AVEIndex, attrTypes),
-		// TODO vae will only ever need a uint typed index
-		vae:          index.NewCompositeIndex(degree, index.VAEIndex, attrTypes),
+		eav:          eav,
+		aev:          aev,
+		ave:          ave,
+		vae:          vae,
 		attrsByID:    attrsByID,
 		attrsByIdent: attrsByIdent,
 		attrTypes:    attrTypes,
@@ -191,30 +202,22 @@ CLAIMS:
 			// TODO if this is cardinality one, we must replace extant datum if ea but not v
 			eav.Insert(datum)
 			aev.Insert(datum)
-			ok := false
-			_, ok = db.refAttrs[datum.A]
+			_, ok := db.uniqueAttrs[datum.A]
 			if ok {
 				ave.Insert(datum)
+			}
+			if db.attrTypes[datum.A] == sys.AttrTypeRef {
 				vae.Insert(datum)
-			} else {
-				_, ok = db.uniqueAttrs[datum.A]
-				if ok {
-					ave.Insert(datum)
-				}
 			}
 		} else {
 			eav.Delete(datum)
 			aev.Delete(datum)
-			ok := false
-			_, ok = db.refAttrs[datum.A]
+			_, ok := db.uniqueAttrs[datum.A]
 			if ok {
 				ave.Delete(datum)
+			}
+			if db.attrTypes[datum.A] == sys.AttrTypeRef {
 				vae.Delete(datum)
-			} else {
-				_, ok = db.uniqueAttrs[datum.A]
-				if ok {
-					ave.Delete(datum)
-				}
 			}
 		}
 	}
