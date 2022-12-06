@@ -4,6 +4,7 @@ package index
 import (
 	"time"
 
+	"github.com/dball/destructive/internal/iterator"
 	"github.com/dball/destructive/internal/sys"
 	. "github.com/dball/destructive/internal/types"
 )
@@ -15,6 +16,15 @@ type IndexType struct {
 	UintLesser   Lesser[uint64]
 	FloatLesser  Lesser[float64]
 }
+
+type PartialIndex int8
+
+const EA PartialIndex = 1
+const E PartialIndex = 2
+const AE PartialIndex = 3
+const A PartialIndex = 4
+const AV PartialIndex = 5
+const VA PartialIndex = 6
 
 // EAVIndex is the EAV index type.
 var EAVIndex = IndexType{
@@ -52,6 +62,7 @@ type Index interface {
 	Find(datum Datum) (extant bool)
 	Insert(datum Datum) (extant bool)
 	Delete(datum Datum) (extant bool)
+	Select(p PartialIndex, datum Datum) (iter *iterator.Iterator[Datum])
 	Clone() (clone Index)
 }
 
@@ -140,6 +151,36 @@ func (idx *CompositeIndex) Delete(datum Datum) (extant bool) {
 		}
 	case sys.AttrTypeInst:
 		extant = idx.ints.Delete(TypedDatum[int64]{E: datum.E, A: datum.A, V: time.Time(datum.V.(Inst)).UnixMilli()})
+	}
+	return
+}
+
+func (idx *CompositeIndex) Select(p PartialIndex, datum Datum) (iter *iterator.Iterator[Datum]) {
+	// TODO should idx ensure p is legit for its type? This would just be a cross check against the
+	// database misusing its indexes.
+	switch idx.attrTypes[datum.A] {
+	case sys.AttrTypeString:
+		switch p {
+		case EA:
+			iter = idx.strings.Select(CompareEA[string], TypedDatum[string]{E: datum.E, A: datum.A})
+		case AE:
+			iter = idx.strings.Select(CompareAE[string], TypedDatum[string]{E: datum.E, A: datum.A})
+		case A:
+			iter = idx.strings.Select(CompareA[string], TypedDatum[string]{A: datum.A})
+		case AV:
+			iter = idx.strings.Select(CompareAV[string], TypedDatum[string]{A: datum.A, V: string(datum.V.(String))})
+		}
+		// TODO all the cases
+	case sys.AttrTypeInt:
+	case sys.AttrTypeRef:
+	case sys.AttrTypeFloat:
+	case sys.AttrTypeBool:
+		if bool(datum.V.(Bool)) {
+		} else {
+		}
+	case sys.AttrTypeInst:
+	case 0:
+		// a can't tell us the type, so we have to go across all types
 	}
 	return
 }

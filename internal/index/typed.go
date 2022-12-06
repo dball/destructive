@@ -1,6 +1,7 @@
 package index
 
 import (
+	"github.com/dball/destructive/internal/iterator"
 	. "github.com/dball/destructive/internal/types"
 	"golang.org/x/exp/constraints"
 
@@ -8,7 +9,10 @@ import (
 )
 
 // TypedDatum represents a datum with a specific V type. These will use less memory than interface V types
-// and their values can be compared with an operator.
+// and their values can be compared with an operator. Note that we probably lose throughput and add memory
+// churn on select as we convert TypedDatum instances into Datum instances. Possibly it would be least bad
+// to store the data as datums with interface v and use unsafe pointer foo to interpret the v memory
+// efficiently based on the type of a.
 type TypedDatum[X constraints.Ordered] struct {
 	E ID
 	A ID
@@ -28,6 +32,7 @@ type TypedIndex[X constraints.Ordered] interface {
 	// Clone returns a copy of the index. Both the original and the clone may be changed hereafter
 	// without either affecting the other.
 	Clone() (clone TypedIndex[X])
+	Select(comparer Comparer[X], datum TypedDatum[X]) (iter *iterator.Iterator[Datum])
 }
 
 type btreeIndex[X constraints.Ordered] struct {
@@ -66,4 +71,8 @@ func (index *btreeIndex[X]) Delete(datum TypedDatum[X]) (extant bool) {
 
 func (index *btreeIndex[X]) Clone() (clone TypedIndex[X]) {
 	return &btreeIndex[X]{tree: index.tree.Clone()}
+}
+
+func (idx *btreeIndex[X]) Select(comparer Comparer[X], datum TypedDatum[X]) (iter *iterator.Iterator[Datum]) {
+	panic("TODO")
 }
