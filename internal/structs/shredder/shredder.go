@@ -73,15 +73,15 @@ func (s *shredder) Shred(doc Document) (req Request, err error) {
 	for _, claim := range req.Claims {
 		e, ok := claim.E.(TempID)
 		if ok {
-			id, ok := confetti.tempIDs[e]
-			if ok {
+			id := confetti.tempIDs[e]
+			if id != 0 {
 				claim.E = id
 			}
 		}
 		v, ok := claim.V.(TempID)
 		if ok {
-			id, ok := confetti.tempIDs[v]
-			if ok {
+			id := confetti.tempIDs[v]
+			if id != 0 {
 				claim.V = id
 			}
 		}

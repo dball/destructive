@@ -56,8 +56,6 @@ func TestShred(t *testing.T) {
 		assert.Equal(t, expected, req)
 	})
 
-	t.Skip()
-
 	t.Run("non-empty uuid", func(t *testing.T) {
 		shredder := NewShredder()
 		p := person{id: 23, name: "Donald", uuid: "the-uuid"}
