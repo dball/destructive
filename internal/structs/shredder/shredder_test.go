@@ -96,7 +96,6 @@ func TestShred(t *testing.T) {
 	})
 }
 
-/*
 func TestRefs(t *testing.T) {
 	type Person struct {
 		Name string  `attr:"person/name"`
@@ -118,10 +117,7 @@ func TestRefs(t *testing.T) {
 				{E: TempID("2"), A: Ident("person/name"), V: String("Pabu")},
 				{E: TempID("2"), A: Ident("person/bff"), V: TempID("1")},
 			},
-			TempIDs: map[TempID]map[IDRef]Void{
-				TempID("1"): {},
-				TempID("2"): {},
-			},
+			Retractions: []*Retraction{},
 		}
 		assert.Equal(t, expected, actual)
 	})
@@ -148,10 +144,7 @@ func TestStructs(t *testing.T) {
 				{E: TempID("1"), A: Ident("person/favorite-book"), V: TempID("2")},
 				{E: TempID("2"), A: Ident("book/title"), V: String("Immortality")},
 			},
-			TempIDs: map[TempID]map[IDRef]Void{
-				TempID("1"): {},
-				TempID("2"): {},
-			},
+			Retractions: []*Retraction{},
 		}
 		assert.Equal(t, expected, actual)
 	})
@@ -187,11 +180,7 @@ func TestMapFields(t *testing.T) {
 				{E: TempID("3"), A: Ident("book/title"), V: String("Parable of the Sower")},
 				{E: TempID("3"), A: Ident("book/author"), V: String("Octavia Butler")},
 			},
-			TempIDs: map[TempID]map[IDRef]Void{
-				TempID("1"): {LookupRef{A: Ident("person/name"), V: String("Donald")}: Void{}},
-				TempID("2"): {},
-				TempID("3"): {},
-			},
+			Retractions: []*Retraction{},
 		}
 		expected2 := Request{
 			Claims: []*Claim{
@@ -203,11 +192,7 @@ func TestMapFields(t *testing.T) {
 				{E: TempID("3"), A: Ident("book/title"), V: String("Immortality")},
 				{E: TempID("3"), A: Ident("book/author"), V: String("Milan Kundera")},
 			},
-			TempIDs: map[TempID]map[IDRef]Void{
-				TempID("1"): {LookupRef{A: Ident("person/name"), V: String("Donald")}: Void{}},
-				TempID("2"): {},
-				TempID("3"): {},
-			},
+			Retractions: []*Retraction{},
 		}
 		switch {
 		case assert.ObjectsAreEqual(expected1, actual):
@@ -251,12 +236,7 @@ func TestScalarSliceFields(t *testing.T) {
 				{E: TempID("4"), A: Ident("sys/db/rank"), V: Int(2)},
 				{E: TempID("4"), A: Ident("test/score"), V: Float(98.9)},
 			},
-			TempIDs: map[TempID]map[IDRef]Void{
-				TempID("1"): {},
-				TempID("2"): {},
-				TempID("3"): {},
-				TempID("4"): {},
-			},
+			Retractions: []*Retraction{},
 		}
 		assert.Equal(t, expected, actual)
 	})
@@ -303,14 +283,8 @@ func TestStructSliceFields(t *testing.T) {
 				{E: TempID("4"), A: Ident("sys/db/rank"), V: Int(2)},
 				{E: TempID("4"), A: Ident("test/score"), V: Float(98.9)},
 			},
-			TempIDs: map[TempID]map[IDRef]Void{
-				TempID("1"): {},
-				TempID("2"): {},
-				TempID("3"): {},
-				TempID("4"): {},
-			},
+			Retractions: []*Retraction{},
 		}
 		assert.Equal(t, expected, actual)
 	})
 }
-*/
