@@ -163,6 +163,14 @@ func (idx *CompositeIndex) Delete(datum Datum) (extant bool) {
 func (idx *CompositeIndex) Select(p PartialIndex, datum Datum) (iter *iterator.Iterator[Datum]) {
 	// TODO should idx ensure p is legit for its type? This would just be a cross check against the
 	// database misusing its indexes.
+
+	if p == E {
+		strings := idx.strings.Select(CompareE[string], stringUnwrap, TypedDatum[string]{E: datum.E})
+		// TODO other typed index cases
+		// TODO our iterators could maintain eav sorting if build one that peeks ahead
+		iter = iterator.Iterators(strings)
+		return
+	}
 	switch idx.attrTypes[datum.A] {
 	case sys.AttrTypeString:
 		switch p {
@@ -184,8 +192,6 @@ func (idx *CompositeIndex) Select(p PartialIndex, datum Datum) (iter *iterator.I
 		} else {
 		}
 	case sys.AttrTypeInst:
-	case 0:
-		// a can't tell us the type, so we have to go across all types
 	}
 	return
 }

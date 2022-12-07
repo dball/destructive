@@ -63,7 +63,7 @@ func TestIndexTimeProperties(t *testing.T) {
 
 	assert.False(t, idx.Insert(d1))
 
-	assert.Equal(t, []Datum{d1}, idx.Select(EA, d2).Drain())
+	assert.Equal(t, []Datum{d1}, idx.Select(E, d2).Drain())
 	assert.True(t, idx.Find(d2))
 	assert.True(t, idx.Delete(d2))
 	assert.False(t, idx.Delete(d2))
