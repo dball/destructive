@@ -63,11 +63,24 @@ func stringUnwrap(typed TypedDatum[string]) (datum Datum) {
 	return
 }
 
+// Index is a sorted set of datums, where the basis for uniqueness is eav. An index
+// will retain the extant datum if a new one is inserted for the same eav.
+//
+// Index instances are safe for concurrent reads, not for concurrent writes.
 type Index interface {
+	// Find returns true if a datum with the given datum's eav values is present in the indexed set.
 	Find(datum Datum) (extant bool)
+	// Insert ensures a datum with the given datum's eav values is present in the indexed set. If
+	// this returns true, the indexed datum will have the given datum's t value.
 	Insert(datum Datum) (extant bool)
+	// Delete ensures no datum with the given datum's eav values is present in the indexed set.
+	// If this returns true, a datum was deleted in so doing.
 	Delete(datum Datum) (extant bool)
+	// Select returns an iterator of datums that match the given datum according to the partial
+	// index.
 	Select(p PartialIndex, datum Datum) (iter *iterator.Iterator[Datum])
+	// Clone returns a copy of the index. Both instances are hereafter safe to change without affecting
+	// the other.
 	Clone() (clone Index)
 }
 
@@ -82,7 +95,9 @@ type CompositeIndex struct {
 
 var _ Index = &CompositeIndex{}
 
-// NewCompositeIndex returns a new composite index of the given degree and type.
+// NewCompositeIndex returns a new composite index of the given degree and index type. This
+// creates a btree index for each of the four go scalar types to which the system attribute
+// types most naturally serialize.
 func NewCompositeIndex(degree int, indexType IndexType, attrTypes map[ID]ID) (composite *CompositeIndex) {
 	composite = &CompositeIndex{
 		attrTypes: attrTypes,
