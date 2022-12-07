@@ -58,6 +58,11 @@ var VAEIndex = IndexType{
 	FloatLesser:  LessVAE[float64],
 }
 
+func stringUnwrap(typed TypedDatum[string]) (datum Datum) {
+	datum = Datum{E: typed.E, A: typed.A, V: String(any(typed.V).(string)), T: typed.T}
+	return
+}
+
 type Index interface {
 	Find(datum Datum) (extant bool)
 	Insert(datum Datum) (extant bool)
@@ -114,21 +119,21 @@ func (idx *CompositeIndex) Find(datum Datum) (extant bool) {
 func (idx *CompositeIndex) Insert(datum Datum) (extant bool) {
 	switch idx.attrTypes[datum.A] {
 	case sys.AttrTypeString:
-		extant = idx.strings.Insert(TypedDatum[string]{E: datum.E, A: datum.A, V: string(datum.V.(String))})
+		extant = idx.strings.Insert(TypedDatum[string]{E: datum.E, A: datum.A, V: string(datum.V.(String)), T: datum.T})
 	case sys.AttrTypeInt:
-		extant = idx.ints.Insert(TypedDatum[int64]{E: datum.E, A: datum.A, V: int64(datum.V.(Int))})
+		extant = idx.ints.Insert(TypedDatum[int64]{E: datum.E, A: datum.A, V: int64(datum.V.(Int)), T: datum.T})
 	case sys.AttrTypeRef:
-		extant = idx.uints.Insert(TypedDatum[uint64]{E: datum.E, A: datum.A, V: uint64(datum.V.(ID))})
+		extant = idx.uints.Insert(TypedDatum[uint64]{E: datum.E, A: datum.A, V: uint64(datum.V.(ID)), T: datum.T})
 	case sys.AttrTypeFloat:
-		extant = idx.floats.Insert(TypedDatum[float64]{E: datum.E, A: datum.A, V: float64(datum.V.(Float))})
+		extant = idx.floats.Insert(TypedDatum[float64]{E: datum.E, A: datum.A, V: float64(datum.V.(Float)), T: datum.T})
 	case sys.AttrTypeBool:
 		if bool(datum.V.(Bool)) {
-			extant = idx.uints.Insert(TypedDatum[uint64]{E: datum.E, A: datum.A, V: 1})
+			extant = idx.uints.Insert(TypedDatum[uint64]{E: datum.E, A: datum.A, V: 1, T: datum.T})
 		} else {
-			extant = idx.uints.Insert(TypedDatum[uint64]{E: datum.E, A: datum.A, V: 0})
+			extant = idx.uints.Insert(TypedDatum[uint64]{E: datum.E, A: datum.A, V: 0, T: datum.T})
 		}
 	case sys.AttrTypeInst:
-		extant = idx.ints.Insert(TypedDatum[int64]{E: datum.E, A: datum.A, V: time.Time(datum.V.(Inst)).UnixMilli()})
+		extant = idx.ints.Insert(TypedDatum[int64]{E: datum.E, A: datum.A, V: time.Time(datum.V.(Inst)).UnixMilli(), T: datum.T})
 	}
 	return
 }
@@ -162,13 +167,13 @@ func (idx *CompositeIndex) Select(p PartialIndex, datum Datum) (iter *iterator.I
 	case sys.AttrTypeString:
 		switch p {
 		case EA:
-			iter = idx.strings.Select(CompareEA[string], TypedDatum[string]{E: datum.E, A: datum.A})
+			iter = idx.strings.Select(CompareEA[string], stringUnwrap, TypedDatum[string]{E: datum.E, A: datum.A})
 		case AE:
-			iter = idx.strings.Select(CompareAE[string], TypedDatum[string]{E: datum.E, A: datum.A})
+			iter = idx.strings.Select(CompareAE[string], stringUnwrap, TypedDatum[string]{E: datum.E, A: datum.A})
 		case A:
-			iter = idx.strings.Select(CompareA[string], TypedDatum[string]{A: datum.A})
+			iter = idx.strings.Select(CompareA[string], stringUnwrap, TypedDatum[string]{A: datum.A})
 		case AV:
-			iter = idx.strings.Select(CompareAV[string], TypedDatum[string]{A: datum.A, V: string(datum.V.(String))})
+			iter = idx.strings.Select(CompareAV[string], stringUnwrap, TypedDatum[string]{A: datum.A, V: string(datum.V.(String))})
 		}
 		// TODO all the cases
 	case sys.AttrTypeInt:

@@ -20,6 +20,10 @@ type TypedDatum[X constraints.Ordered] struct {
 	T ID
 }
 
+type Wrapper[X constraints.Ordered] func(datum Datum) (typed TypedDatum[X])
+
+type Unwrapper[X constraints.Ordered] func(typed TypedDatum[X]) (datum Datum)
+
 // TypedIndex instances maintain sorted sets of typed datums. Indexes are safe for concurrent read
 // operations but may not be safe for concurrent write operations, including cloning.
 type TypedIndex[X constraints.Ordered] interface {
@@ -32,7 +36,7 @@ type TypedIndex[X constraints.Ordered] interface {
 	// Clone returns a copy of the index. Both the original and the clone may be changed hereafter
 	// without either affecting the other.
 	Clone() (clone TypedIndex[X])
-	Select(comparer Comparer[X], datum TypedDatum[X]) (iter *iterator.Iterator[Datum])
+	Select(comparer Comparer[X], unwrap Unwrapper[X], datum TypedDatum[X]) (iter *iterator.Iterator[Datum])
 }
 
 type btreeIndex[X constraints.Ordered] struct {
@@ -73,6 +77,26 @@ func (index *btreeIndex[X]) Clone() (clone TypedIndex[X]) {
 	return &btreeIndex[X]{tree: index.tree.Clone()}
 }
 
-func (idx *btreeIndex[X]) Select(comparer Comparer[X], datum TypedDatum[X]) (iter *iterator.Iterator[Datum]) {
-	panic("TODO")
+type selection[X constraints.Ordered] struct {
+	idx      *btreeIndex[X]
+	comparer Comparer[X]
+	datum    TypedDatum[X]
+	unwrap   Unwrapper[X]
+}
+
+func (sel *selection[X]) Each(accept iterator.Accept[Datum]) {
+	sel.idx.tree.AscendGreaterOrEqual(sel.datum, func(datum TypedDatum[X]) bool {
+		switch sel.comparer(sel.datum, datum) {
+		case 0:
+			return accept(sel.unwrap(datum))
+		case 1, -1:
+			return false
+		default:
+			panic("index.typed.selection.each")
+		}
+	})
+}
+
+func (idx *btreeIndex[X]) Select(comparer Comparer[X], unwrap Unwrapper[X], datum TypedDatum[X]) (iter *iterator.Iterator[Datum]) {
+	return iterator.BuildIterator[Datum](&selection[X]{idx, comparer, datum, unwrap})
 }

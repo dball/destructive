@@ -29,7 +29,9 @@ func TestIndex(t *testing.T) {
 	assert.True(t, idx.Find(d1))
 	assert.True(t, idx.Find(d2))
 
-	assert.Equal(t, []Datum{d1, d2}, idx.Select(EA, Datum{E: a, A: a}).Drain())
+	assert.Equal(t, []Datum{d2, d1}, idx.Select(EA, Datum{E: e, A: a}).Drain())
+	assert.Equal(t, []Datum{}, idx.Select(EA, Datum{E: e - 1, A: a}).Drain())
+	assert.Equal(t, []Datum{}, idx.Select(EA, Datum{E: e + 1, A: a}).Drain())
 
 	assert.True(t, idx.Delete(d1))
 	assert.False(t, idx.Find(d1))
