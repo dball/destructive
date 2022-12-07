@@ -20,9 +20,12 @@ type TypedDatum[X constraints.Ordered] struct {
 	T ID
 }
 
-type Wrapper[X constraints.Ordered] func(datum Datum) (typed TypedDatum[X])
-
-type Unwrapper[X constraints.Ordered] func(typed TypedDatum[X]) (datum Datum)
+type Valuer[X constraints.Ordered] func(v X) (value Value)
+type Devaluer[X constraints.Ordered] func(value Value) (v X)
+type TypeValuer[X constraints.Ordered] struct {
+	valuer   Valuer[X]
+	devaluer Devaluer[X]
+}
 
 // TypedIndex instances maintain sorted sets of typed datums. Indexes are safe for concurrent read
 // operations but may not be safe for concurrent write operations, including cloning.
@@ -36,7 +39,10 @@ type TypedIndex[X constraints.Ordered] interface {
 	// Clone returns a copy of the index. Both the original and the clone may be changed hereafter
 	// without either affecting the other.
 	Clone() (clone TypedIndex[X])
-	Select(comparer Comparer[X], unwrap Unwrapper[X], datum TypedDatum[X]) (iter *iterator.Iterator[Datum])
+	// Select returns an ascending iterator of datums starting at the point datum would occupy in the
+	// ordered set for which the comparer returns 0. The v values of those datums are converted from
+	// indexed storage values to datum Values with the valuer function.
+	Select(comparer Comparer[X], valuer Valuer[X], datum TypedDatum[X]) (iter *iterator.Iterator[Datum])
 }
 
 type btreeIndex[X constraints.Ordered] struct {
@@ -81,14 +87,14 @@ type selection[X constraints.Ordered] struct {
 	idx      *btreeIndex[X]
 	comparer Comparer[X]
 	datum    TypedDatum[X]
-	unwrap   Unwrapper[X]
+	valuer   Valuer[X]
 }
 
 func (sel *selection[X]) Each(accept iterator.Accept[Datum]) {
 	sel.idx.tree.AscendGreaterOrEqual(sel.datum, func(datum TypedDatum[X]) bool {
 		switch sel.comparer(sel.datum, datum) {
 		case 0:
-			return accept(sel.unwrap(datum))
+			return accept(Datum{E: datum.E, A: datum.A, V: sel.valuer(datum.V), T: datum.T})
 		case 1, -1:
 			return false
 		default:
@@ -97,6 +103,6 @@ func (sel *selection[X]) Each(accept iterator.Accept[Datum]) {
 	})
 }
 
-func (idx *btreeIndex[X]) Select(comparer Comparer[X], unwrap Unwrapper[X], datum TypedDatum[X]) (iter *iterator.Iterator[Datum]) {
-	return iterator.BuildIterator[Datum](&selection[X]{idx, comparer, datum, unwrap})
+func (idx *btreeIndex[X]) Select(comparer Comparer[X], valuer Valuer[X], datum TypedDatum[X]) (iter *iterator.Iterator[Datum]) {
+	return iterator.BuildIterator[Datum](&selection[X]{idx, comparer, datum, valuer})
 }
