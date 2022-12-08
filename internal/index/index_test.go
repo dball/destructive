@@ -69,3 +69,79 @@ func TestIndexTimeProperties(t *testing.T) {
 	assert.False(t, idx.Delete(d2))
 	assert.False(t, idx.Find(d2))
 }
+
+func TestIndexSelection(t *testing.T) {
+	allocate := newAllocator()
+	a1 := allocate()
+	a2 := allocate()
+	a3 := allocate()
+	idx := NewCompositeIndex(32, EAVIndex, map[ID]ID{
+		a1: sys.AttrTypeInt,
+		a2: sys.AttrTypeInt,
+		a3: sys.AttrTypeInt,
+	})
+	tx := allocate()
+	n := 3
+	var es []ID
+	for i := 0; i < n; i++ {
+		e := allocate()
+		es = append(es, e)
+		m := 5
+		for j := 0; j < 5; j++ {
+			idx.Insert(Datum{E: e, A: a1, V: Int(j), T: tx})
+			idx.Insert(Datum{E: e, A: a2, V: Int(j + 1), T: tx})
+			// We insert in reverse order, and the index will sort on select
+			idx.Insert(Datum{E: e, A: a3, V: Int(m - j), T: tx})
+		}
+	}
+
+	t.Run("ea1", func(t *testing.T) {
+		expected := []Datum{
+			{E: es[0], A: a1, V: Int(0), T: tx},
+			{E: es[0], A: a1, V: Int(1), T: tx},
+			{E: es[0], A: a1, V: Int(2), T: tx},
+			{E: es[0], A: a1, V: Int(3), T: tx},
+			{E: es[0], A: a1, V: Int(4), T: tx},
+		}
+		assert.Equal(t, expected, idx.Select(EA, Datum{E: es[0], A: a1}).Drain())
+	})
+
+	t.Run("e", func(t *testing.T) {
+		expected := []Datum{
+			{E: es[1], A: a1, V: Int(0), T: tx},
+			{E: es[1], A: a1, V: Int(1), T: tx},
+			{E: es[1], A: a1, V: Int(2), T: tx},
+			{E: es[1], A: a1, V: Int(3), T: tx},
+			{E: es[1], A: a1, V: Int(4), T: tx},
+			{E: es[1], A: a2, V: Int(1), T: tx},
+			{E: es[1], A: a2, V: Int(2), T: tx},
+			{E: es[1], A: a2, V: Int(3), T: tx},
+			{E: es[1], A: a2, V: Int(4), T: tx},
+			{E: es[1], A: a2, V: Int(5), T: tx},
+			{E: es[1], A: a3, V: Int(1), T: tx},
+			{E: es[1], A: a3, V: Int(2), T: tx},
+			{E: es[1], A: a3, V: Int(3), T: tx},
+			{E: es[1], A: a3, V: Int(4), T: tx},
+			{E: es[1], A: a3, V: Int(5), T: tx},
+		}
+		assert.Equal(t, expected, idx.Select(E, Datum{E: es[1]}).Drain())
+	})
+
+	t.Run("ae", func(t *testing.T) {
+		expected := []Datum{
+			{E: es[2], A: a3, V: Int(1), T: tx},
+			{E: es[2], A: a3, V: Int(2), T: tx},
+			{E: es[2], A: a3, V: Int(3), T: tx},
+			{E: es[2], A: a3, V: Int(4), T: tx},
+			{E: es[2], A: a3, V: Int(5), T: tx},
+		}
+		assert.Equal(t, expected, idx.Select(AE, Datum{E: es[2], A: a3}).Drain())
+	})
+
+	// TODO this is unsatisfiable by the eav index. Currently, we return an empty
+	// iterator, but that's as accidental as anything. What should we return?
+	t.Run("a", func(t *testing.T) {
+		expected := []Datum{}
+		assert.Equal(t, expected, idx.Select(A, Datum{A: a2}).Drain())
+	})
+}
