@@ -220,18 +220,74 @@ func (idx *CompositeIndex) Delete(datum Datum) (extant bool) {
 	return
 }
 
+type polyTypeIterator struct {
+	idx     *CompositeIndex
+	strings *iterator.Iterator[Datum]
+	ints    *iterator.Iterator[Datum]
+	uints   *iterator.Iterator[Datum]
+	floats  *iterator.Iterator[Datum]
+}
+
+// TODO our iterators could maintain eav sorting if we build sorted peekahead
+func (poly *polyTypeIterator) Each(accept iterator.Accept[Datum]) {
+	var iter *iterator.Iterator[Datum]
+	iter = poly.strings
+	for iter.Next() {
+		if !accept(iter.Value()) {
+			iter.Stop()
+			poly.ints.Stop()
+			poly.uints.Stop()
+			poly.floats.Stop()
+		}
+	}
+	iter = poly.ints
+	for iter.Next() {
+		datum := iter.Value()
+		switch poly.idx.attrTypes[datum.A] {
+		case sys.AttrTypeInt:
+		case sys.AttrTypeInst:
+			datum.V = instValuer.valuer(int64(datum.V.(Int)))
+		default:
+			panic("index.typed.int.corrupt")
+		}
+		if !accept(datum) {
+			iter.Stop()
+			poly.uints.Stop()
+			poly.floats.Stop()
+		}
+	}
+	iter = poly.uints
+	for iter.Next() {
+		datum := iter.Value()
+		switch poly.idx.attrTypes[datum.A] {
+		case sys.AttrTypeRef:
+		case sys.AttrTypeBool:
+			datum.V = boolValuer.valuer(uint64(datum.V.(ID)))
+		default:
+			panic("index.typed.uint.corrupt")
+		}
+		if !accept(datum) {
+			iter.Stop()
+			poly.floats.Stop()
+		}
+	}
+	iter = poly.floats
+	for iter.Next() {
+		if !accept(iter.Value()) {
+			iter.Stop()
+		}
+	}
+}
+
 func (idx *CompositeIndex) Select(p PartialIndex, datum Datum) (iter *iterator.Iterator[Datum]) {
 	// TODO should idx ensure p is legit for its type? This would just be a cross check against the
 	// database misusing its indexes.
-
 	if p == E {
 		strings := idx.strings.Select(CompareE[string], stringValuer.valuer, TypedDatum[string]{E: datum.E})
-		// TODO other typed index cases
-		// The fun bit here is that the valuer is going to depend on the datum a for the polytypes. Since
-		// there are only two of them, maybe we just make separate btrees for them. Bools could be stored as
-		//
-		// TODO our iterators could maintain eav sorting if build one that peeks ahead
-		iter = iterator.Iterators(strings)
+		ints := idx.ints.Select(CompareE[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E})
+		uints := idx.uints.Select(CompareE[uint64], refValuer.valuer, TypedDatum[uint64]{E: datum.E})
+		floats := idx.floats.Select(CompareE[float64], floatValuer.valuer, TypedDatum[float64]{E: datum.E})
+		iter = iterator.BuildIterator[Datum](&polyTypeIterator{idx, strings, ints, uints, floats})
 		return
 	}
 	switch idx.attrTypes[datum.A] {
