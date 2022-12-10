@@ -12,13 +12,9 @@ import (
 // IndexType is a type of datum index, e.g. EAV.
 type IndexType struct {
 	StringLesser Lesser[string]
-	StringValuer Valuer[string]
 	IntLesser    Lesser[int64]
-	IntValuer    Valuer[int64]
 	UintLesser   Lesser[uint64]
-	UintValuer   Valuer[uint64]
 	FloatLesser  Lesser[float64]
-	FloatValuer  Valuer[float64]
 }
 
 type PartialIndex int8
@@ -33,7 +29,6 @@ const VA PartialIndex = 6
 // EAVIndex is the EAV index type.
 var EAVIndex = IndexType{
 	StringLesser: LessEAV[string],
-	StringValuer: func(v string) (value Value) { return String(any(v).(string)) },
 	IntLesser:    LessEAV[int64],
 	UintLesser:   LessEAV[uint64],
 	FloatLesser:  LessEAV[float64],
@@ -61,11 +56,6 @@ var VAEIndex = IndexType{
 	IntLesser:    LessVAE[int64],
 	UintLesser:   LessVAE[uint64],
 	FloatLesser:  LessVAE[float64],
-}
-
-func stringUnwrap(typed TypedDatum[string]) (datum Datum) {
-	datum = Datum{E: typed.E, A: typed.A, V: String(any(typed.V).(string)), T: typed.T}
-	return
 }
 
 // Index is a sorted set of datums, where the basis for uniqueness is eav. An index

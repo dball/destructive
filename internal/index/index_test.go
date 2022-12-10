@@ -104,6 +104,9 @@ func TestIndexSelection(t *testing.T) {
 			{E: es[0], A: a1, V: Int(4), T: tx},
 		}
 		assert.Equal(t, expected, idx.Select(EA, Datum{E: es[0], A: a1}).Drain())
+		datum, ok := idx.First(EA, Datum{E: es[0], A: a1})
+		assert.True(t, ok)
+		assert.Equal(t, expected[0], datum)
 	})
 
 	t.Run("e", func(t *testing.T) {
@@ -125,6 +128,9 @@ func TestIndexSelection(t *testing.T) {
 			{E: es[1], A: a3, V: Int(5), T: tx},
 		}
 		assert.Equal(t, expected, idx.Select(E, Datum{E: es[1]}).Drain())
+		datum, ok := idx.First(E, Datum{E: es[1]})
+		assert.True(t, ok)
+		assert.Equal(t, expected[0], datum)
 	})
 
 	t.Run("ae", func(t *testing.T) {
@@ -136,6 +142,9 @@ func TestIndexSelection(t *testing.T) {
 			{E: es[2], A: a3, V: Int(5), T: tx},
 		}
 		assert.Equal(t, expected, idx.Select(AE, Datum{E: es[2], A: a3}).Drain())
+		datum, ok := idx.First(AE, Datum{E: es[2], A: a3})
+		assert.True(t, ok)
+		assert.Equal(t, expected[0], datum)
 	})
 
 	// TODO this is unsatisfiable by the eav index. Currently, we return an empty
