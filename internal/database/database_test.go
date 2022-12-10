@@ -36,6 +36,9 @@ func TestWriteSimple(t *testing.T) {
 	assert.NoError(t, res.Error)
 	assert.Equal(t, e, res.NewIDs[TempID("1")])
 	assert.NotEqual(t, tx, res.ID)
+	match, ok = res.Snapshot.Find(Claim{E: e, A: sys.DbIdent, V: String("test/ident")})
+	assert.True(t, ok)
+	assert.Equal(t, Datum{E: e, A: sys.DbIdent, V: String("test/ident")}, match)
 }
 
 func TestWriteAttr(t *testing.T) {

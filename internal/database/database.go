@@ -2,6 +2,7 @@
 package database
 
 import (
+	"log"
 	"sync"
 
 	"github.com/dball/destructive/internal/index"
@@ -24,6 +25,7 @@ type indexDatabase struct {
 	idents         map[Ident]ID
 
 	lock   sync.RWMutex
+	logger log.Logger
 	nextID ID
 }
 
@@ -80,6 +82,7 @@ func NewIndexDatabase(degree int, attrsSize int, identsSize int) (db Database) {
 		attrCardManies: attrCardManies,
 		idents:         idents,
 		nextID:         sys.FirstUserID,
+		logger:         *log.Default(),
 	}
 	return
 }
@@ -130,16 +133,12 @@ CLAIMS:
 						if ok {
 							res.Error = NewError("database.write.uniqueValueImpossible", "datum", datum)
 							break CLAIMS
+						} else {
+							rewrites[datum.E] = d.E
 						}
-						rewrites[datum.E] = d.E
 					case sys.AttrUniqueValue:
 						res.Error = NewError("database.write.uniqueValueCollision", "datum", datum, "extant", d)
 						break CLAIMS
-					}
-				} else {
-					iter := db.ave.Select(index.AV, *datum)
-					if iter.Next() {
-						panic("WHAT")
 					}
 				}
 			}
@@ -150,13 +149,31 @@ CLAIMS:
 	if res.Error == nil {
 		eav := db.eav.Clone()
 		aev := db.aev.Clone()
-		// TODO could defer this clone until we know we need it
-		ave := db.aev.Clone()
-		// TODO could defer this clone until we know we need it
+		// Could defer this clone until we know we need it
+		ave := db.ave.Clone()
+		// Could defer this clone until we know we need it
 		vae := db.vae.Clone()
+		// We could consider transacting into the indexes concurrently.
 		for i, datum := range data {
-			// TODO we could transact datums into the indexes concurrently after we have resolved all claims
 			claim := req.Claims[i]
+			// TempIDs may have been assigned IDs that subsequently resolved to identity
+			// unique datum ids, so we rewrite them if so.
+			tempid, ok := claim.E.(TempID)
+			if ok {
+				id, ok := rewrites[datum.E]
+				if ok {
+					datum.E = id
+					res.NewIDs[tempid] = id
+				}
+			}
+			tempid, ok = claim.V.(TempID)
+			if ok {
+				id, ok := rewrites[datum.V.(ID)]
+				if ok {
+					datum.V = id
+					res.NewIDs[tempid] = id
+				}
+			}
 			if !claim.Retract {
 				_, ok := db.attrCardManies[datum.A]
 				if !ok {

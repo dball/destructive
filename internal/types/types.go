@@ -2,6 +2,7 @@
 package types
 
 import (
+	"fmt"
 	"reflect"
 	"time"
 )
@@ -14,23 +15,51 @@ type Value interface {
 	IsEmpty() bool
 }
 
-// IDs are issued by the system and never reused. 0 is not a valid id.
+// ID is issued by the system and never reused. 0 is not a valid id.
 type ID uint64
+
+func (id ID) String() string {
+	return fmt.Sprintf("#id(%d)", uint64(id))
+}
 
 // String is a string.
 type String string
 
+func (s String) String() string {
+	return fmt.Sprintf("#str(\"%s\"", string(s))
+}
+
 // Int is a signed integer.
 type Int int64
+
+func (i Int) String() string {
+	return fmt.Sprintf("#int(%d)", int64(i))
+}
 
 // Bool is a boolean.
 type Bool bool
 
+func (b Bool) String() string {
+	if bool(b) {
+		return "#t"
+	} else {
+		return "#f"
+	}
+}
+
 // Inst is a instant in time.
 type Inst time.Time
 
+func (inst Inst) String() string {
+	return fmt.Sprintf("#inst(\"%s\")", time.Time(inst).Format(time.RFC3339))
+}
+
 // Float is a floating-point number.
 type Float float64
+
+func (f Float) String() string {
+	return fmt.Sprintf("#float(%v)", float64(f))
+}
 
 // TimeType is the type of golang's Time value.
 var TimeType = reflect.TypeOf(time.Time{})
@@ -54,6 +83,10 @@ type Datum struct {
 	V Value
 	// T is the transaction id.
 	T ID
+}
+
+func (d Datum) String() string {
+	return fmt.Sprintf("#d[%s, %s, %s, %s]", d.E, d.A, d.V, d.T)
 }
 
 // D is a convenience function for building a datum.
