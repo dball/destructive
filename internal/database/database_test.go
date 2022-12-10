@@ -42,7 +42,6 @@ func TestWriteSimple(t *testing.T) {
 }
 
 func TestWriteAttr(t *testing.T) {
-	t.Skip()
 	db := NewIndexDatabase(32, 64, 64)
 	req := Request{
 		Claims: []*Claim{
@@ -64,7 +63,8 @@ func TestWriteAttr(t *testing.T) {
 	}
 	res = db.Write(req)
 	assert.NoError(t, res.Error)
-	assert.Zero(t, res.ID)
-	assert.Nil(t, res.NewIDs)
+	assert.Positive(t, res.ID)
+	id := res.NewIDs[TempID("1")]
+	assert.Positive(t, id)
 	assert.NotNil(t, res.Snapshot)
 }

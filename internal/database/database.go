@@ -114,6 +114,9 @@ func (db *indexDatabase) Write(req Request) (res Response) {
 	lastID := db.nextID
 	res.ID = db.allocateID()
 	data := make([]*Datum, 0, len(req.Claims))
+	attrChanges := map[ID]Attr{}
+	identCreates := map[ID]Ident{}
+	identDeletes := map[ID]Ident{}
 CLAIMS:
 	for _, claim := range req.Claims {
 		datum := db.evaluateClaim(&res, assigned, claim)
@@ -123,8 +126,6 @@ CLAIMS:
 		if !claim.Retract {
 			unique := db.attrUniques[datum.A]
 			if unique != 0 {
-				// TODO First is not returning the value we expect here :(
-				// db.ave does not appear to be sorted as expected!!
 				d, ok := db.ave.First(index.AV, *datum)
 				if ok {
 					switch unique {
@@ -143,7 +144,108 @@ CLAIMS:
 				}
 			}
 		}
+		// Enforce system invariants and maintain database caches.
+		switch datum.A {
+		case sys.DbIdent:
+			ident := Ident(datum.V.(String))
+			// Attributes may not change their idents
+			attr, ok := db.attrsByID[datum.E]
+			if ok {
+				switch {
+				case claim.Retract:
+					res.Error = NewError("database.write.attrIdentRetractDisallowed", "datum", datum)
+					break CLAIMS
+				case ident != attr.Ident:
+					res.Error = NewError("database.write.attrIdentChangeDisallowed", "datum", datum)
+					break CLAIMS
+				}
+			} else {
+				if !sys.ValidUserIdent(String(ident)) {
+					res.Error = NewError("database.write.invalidUserIdent", "datum", datum)
+					break CLAIMS
+				}
+				if claim.Retract {
+					identDeletes[datum.E] = ident
+				} else {
+					identCreates[datum.E] = ident
+				}
+			}
+		case sys.AttrType:
+			typ := datum.V.(ID)
+			if claim.Retract {
+				res.Error = NewError("database.write.attrRetractDisallowed", "datum", datum)
+				break CLAIMS
+			}
+			attr, ok := db.attrsByID[datum.E]
+			if ok {
+				if attr.Type != typ {
+					res.Error = NewError("database.write.attrTypeChangeDisallowed", "datum", datum)
+					break CLAIMS
+				}
+			} else {
+				attr = attrChanges[datum.E]
+				attr.ID = datum.E
+				attr.Type = typ
+				attrChanges[datum.E] = attr
+			}
+		case sys.AttrCardinality:
+			card := datum.V.(ID)
+			if claim.Retract {
+				res.Error = NewError("database.write.attrRetractDisallowed", "datum", datum)
+				break CLAIMS
+			}
+			attr, ok := db.attrsByID[datum.E]
+			if ok {
+				if attr.Cardinality != card {
+					res.Error = NewError("database.write.attrCardinalityChangeDisallowed", "datum", datum)
+					break CLAIMS
+				}
+			} else {
+				attr = attrChanges[datum.E]
+				attr.ID = datum.E
+				attr.Cardinality = card
+				attrChanges[datum.E] = attr
+			}
+		case sys.AttrUnique:
+			unique := datum.V.(ID)
+			if claim.Retract {
+				res.Error = NewError("database.write.attrRetractDisallowed", "datum", datum)
+				break CLAIMS
+			}
+			attr, ok := db.attrsByID[datum.E]
+			if ok {
+				if attr.Unique != unique {
+					res.Error = NewError("database.write.attrUniqueChangeDisallowed", "datum", datum)
+					break CLAIMS
+				}
+			} else {
+				attr = attrChanges[datum.E]
+				attr.ID = datum.E
+				attr.Unique = unique
+				attrChanges[datum.E] = attr
+			}
+		}
 		data = append(data, datum)
+	}
+	for id, attr := range attrChanges {
+		ident, ok := identCreates[id]
+		if !ok {
+			res.Error = NewError("database.write.attrRequiresIdent", "attr", attr)
+			break
+		}
+		attr.Ident = ident
+		if !sys.ValidAttrType(attr.Type) {
+			res.Error = NewError("database.write.invalidAttrType", "attr", attr)
+			break
+		}
+		if attr.Cardinality != 0 && !sys.ValidAttrCardinality(attr.Cardinality) {
+			res.Error = NewError("database.write.invalidAttrCardinality", "attr", attr)
+			break
+		}
+		if !sys.ValidUnique(attr.Unique) {
+			res.Error = NewError("database.write.invalidAttrUnique", "attr", attr)
+			break
+		}
 	}
 	// We now have datums with resolved or assigned ids and consistent avs.
 	if res.Error == nil {
@@ -220,6 +322,24 @@ CLAIMS:
 		db.aev = aev
 		db.ave = ave
 		db.vae = vae
+		for _, ident := range identDeletes {
+			delete(db.idents, ident)
+		}
+		for id, ident := range identCreates {
+			db.idents[ident] = id
+		}
+		for id, attr := range attrChanges {
+			db.idents[attr.Ident] = id
+			db.attrsByID[id] = attr
+			db.attrsByIdent[attr.Ident] = attr
+			db.attrTypes[id] = attr.Type
+			if attr.Cardinality == sys.AttrCardinalityMany {
+				db.attrCardManies[id] = Void{}
+			}
+			if attr.Unique != 0 {
+				db.attrUniques[id] = attr.Unique
+			}
+		}
 	}
 	if res.Error != nil {
 		res.ID = 0
