@@ -154,3 +154,21 @@ func TestIndexSelection(t *testing.T) {
 		assert.Equal(t, expected, idx.Select(A, Datum{A: a2}).Drain())
 	})
 }
+
+func TestAVIndex(t *testing.T) {
+	allocate := newAllocator()
+	tx := allocate()
+	a1 := allocate()
+	idx := NewCompositeIndex(32, AVEIndex, map[ID]ID{
+		a1: sys.AttrTypeString,
+	})
+	e1 := allocate()
+	e2 := allocate()
+	e3 := allocate()
+	idx.Insert(Datum{E: e1, A: a1, V: String("sys/db/ident"), T: tx})
+	idx.Insert(Datum{E: e2, A: a1, V: String("sys/attr/type"), T: tx})
+	idx.Insert(Datum{E: e3, A: a1, V: String("test/ident"), T: tx})
+	datum, ok := idx.First(AV, Datum{A: a1, V: String("test/ident")})
+	assert.True(t, ok)
+	assert.Equal(t, Datum{E: e3, A: a1, V: String("test/ident"), T: tx}, datum)
+}

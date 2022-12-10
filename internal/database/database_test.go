@@ -24,6 +24,14 @@ func TestWriteSimple(t *testing.T) {
 	e = res.NewIDs[TempID("1")]
 	tx = res.ID
 
+	match, ok := res.Snapshot.Find(Claim{E: e, A: sys.DbIdent, V: String("test/ident")})
+	assert.True(t, ok)
+	assert.Equal(t, Datum{E: e, A: sys.DbIdent, V: String("test/ident")}, match)
+	snapshot := db.Read()
+	match, ok = snapshot.Find(Claim{E: e, A: sys.DbIdent, V: String("test/ident")})
+	assert.True(t, ok)
+	assert.Equal(t, Datum{E: e, A: sys.DbIdent, V: String("test/ident")}, match)
+
 	res = db.Write(req)
 	assert.NoError(t, res.Error)
 	assert.Equal(t, e, res.NewIDs[TempID("1")])

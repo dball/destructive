@@ -123,4 +123,5 @@ type Snapshot interface {
 	// Select returns an iterator of datums matching the claim. Empty values in the
 	// claim's fields indicate all values will match.
 	Select(claim Claim) iterator.Iterator[Datum]
+	Find(claim Claim) (match Datum, found bool)
 }

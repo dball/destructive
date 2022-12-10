@@ -94,6 +94,10 @@ func (db *indexDatabase) Read() (snapshot Snapshot) {
 func (db *indexDatabase) read() (snapshot Snapshot) {
 	snapshot = &indexSnapshot{
 		eav: db.eav.Clone(),
+		aev: db.aev.Clone(),
+		ave: db.ave.Clone(),
+		vae: db.vae.Clone(),
+		// TODO idents and attrs, probably
 	}
 	return
 }
@@ -117,6 +121,7 @@ CLAIMS:
 			unique := db.attrUniques[datum.A]
 			if unique != 0 {
 				// TODO First is not returning the value we expect here :(
+				// db.ave does not appear to be sorted as expected!!
 				d, ok := db.ave.First(index.AV, *datum)
 				if ok {
 					switch unique {
@@ -130,6 +135,11 @@ CLAIMS:
 					case sys.AttrUniqueValue:
 						res.Error = NewError("database.write.uniqueValueCollision", "datum", datum, "extant", d)
 						break CLAIMS
+					}
+				} else {
+					iter := db.ave.Select(index.AV, *datum)
+					if iter.Next() {
+						panic("WHAT")
 					}
 				}
 			}
@@ -311,10 +321,31 @@ func (db *indexDatabase) resolveLookupRef(ref LookupRef) (id ID) {
 
 type indexSnapshot struct {
 	eav index.Index
+	aev index.Index
+	ave index.Index
+	vae index.Index
 }
 
 var _ Snapshot = (*indexSnapshot)(nil)
 
 func (snapshot *indexSnapshot) Select(claim Claim) (datums iterator.Iterator[Datum]) {
 	panic("TODO")
+}
+
+func (snapshot *indexSnapshot) Find(claim Claim) (match Datum, found bool) {
+	switch e := claim.E.(type) {
+	case ID:
+		match.E = e
+	}
+	switch a := claim.A.(type) {
+	case ID:
+		match.A = a
+	}
+	value, ok := claim.V.(Value)
+	if ok {
+		match.V = value
+	}
+	// TODO Find needs to return the datum or at least the t
+	found = snapshot.eav.Find(match)
+	return
 }
