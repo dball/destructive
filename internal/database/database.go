@@ -103,177 +103,192 @@ func (db *indexDatabase) Write(req Request) (res Response) {
 	assigned := map[ID]TempID{}
 	db.lock.Lock()
 	defer db.lock.Unlock()
-	eav := db.eav.Clone()
-	aev := db.aev.Clone()
-	// TODO could defer this clone until we know we need it
-	ave := db.aev.Clone()
-	// TODO could defer this clone until we know we need it
-	vae := db.vae.Clone()
-	t := db.allocateID()
-CLAIMS:
+	lastID := db.nextID
+	res.ID = db.allocateID()
+	data := make([]*Datum, 0, len(req.Claims))
 	for _, claim := range req.Claims {
-		datum := Datum{T: t}
-		switch e := claim.E.(type) {
-		case ID:
-			if e == 0 || e >= t {
-				res.Error = NewError("database.write.invalidE", "e", e)
-				break CLAIMS
-			}
-			datum.E = e
-		case Ident:
-			datum.E = db.idents[e]
-			if datum.E == 0 {
-				res.Error = NewError("database.write.invalidE", "e", e)
-				break CLAIMS
-			}
-		case LookupRef:
-			datum.E = db.resolveLookupRef(e)
-			if datum.E == 0 {
-				res.Error = NewError("database.write.invalidE", "e", e)
-				break CLAIMS
-			}
-		case TempID:
-			datum.E = res.NewIDs[e]
-			if datum.E == 0 {
-				datum.E = db.allocateID()
-				res.NewIDs[e] = datum.E
-			}
-		case TxnID:
-			datum.E = t
-		default:
-			res.Error = NewError("database.write.invalidE", "e", e)
-			break CLAIMS
+		datum := db.evaluateClaim(&res, assigned, claim)
+		if res.Error != nil {
+			break
 		}
-		switch a := claim.A.(type) {
-		case ID:
-			if a == 0 || a >= t {
-				res.Error = NewError("database.write.invalidA", "a", a)
-				break CLAIMS
-			}
-			datum.A = a
-		case Ident:
-			datum.A = db.idents[a]
-			if datum.A == 0 {
-				res.Error = NewError("database.write.invalidA", "a", a)
-				break CLAIMS
-			}
-		case LookupRef:
-			datum.A = db.resolveLookupRef(a)
-			if datum.A == 0 {
-				res.Error = NewError("database.write.invalidA", "a", a)
-				break CLAIMS
-			}
-		default:
-			res.Error = NewError("database.write.invalidA", "a", a)
-			break CLAIMS
-		}
-		switch v := claim.V.(type) {
-		case Ident:
-			found := false
-			datum.V, found = db.idents[v]
-			if !found {
-				res.Error = NewError("database.write.invalidV", "v", v)
-				break CLAIMS
-			}
-		case TempID:
-			id := res.NewIDs[v]
-			if id == 0 {
-				// TODO is it okay if there are no claim e's that correspond to this?
-				id = db.allocateID()
-				res.NewIDs[v] = id
-				assigned[id] = v
-			}
-			datum.V = id
-		case LookupRef:
-			id := db.resolveLookupRef(v)
-			if id == 0 {
-				res.Error = NewError("database.write.invalidV", "v", v)
-				break CLAIMS
-			}
-			datum.V = id
-		default:
-			ok := false
-			// TODO we could make ourselves a typed datum right here if we want to commit to that
-			// instead of the composite index abstraction, avoiding an intermediate struct thereby.
-			datum.V, ok = v.(Value)
-			if !ok {
-				res.Error = NewError("database.write.invalidV", "v", v)
-				break CLAIMS
-			}
-		}
-		if !sys.ValidValue(db.attrTypes[datum.A], datum.V) {
-			res.Error = NewError("database.write.inconsistentAV", "datum", datum)
-			break CLAIMS
-		}
-		// TODO we could transact datums into the indexes concurrently after we have resolved all claims
-		if !claim.Retract {
-			unique := db.attrUniques[datum.A]
-			if unique != 0 {
-				d, ok := ave.First(index.AV, datum)
-				if ok {
-					switch unique {
-					case sys.AttrUniqueIdentity:
-						// TODO we have to reassign fully, including datums we may have already written, ugh
-						// this means we really do want to walk the claims first, translating to datums, then
-						// walk the datums, transacting
-					case sys.AttrUniqueValue:
-						res.Error = NewError("database.write.uniqueValueCollision", "datum", datum, "extant", d)
-						break CLAIMS
-					}
-				}
-			}
-			_, ok := db.attrCardManies[datum.A]
-			if !ok {
-				// if this is cardinality one, we must replace extant datum if ea but not v
-				d, ok := eav.First(index.EA, datum)
-				if ok {
-					if d.V == datum.V {
-						continue
-					} else {
-						eav.Delete(d)
-						aev.Delete(d)
-						_, ok := db.attrUniques[datum.A]
-						if ok {
-							ave.Delete(d)
-						}
-						if db.attrTypes[datum.A] == sys.AttrTypeRef {
-							vae.Delete(d)
-						}
-					}
-				}
-			}
-			eav.Insert(datum)
-			aev.Insert(datum)
-			_, ok = db.attrUniques[datum.A]
-			if ok {
-				ave.Insert(datum)
-			}
-			if db.attrTypes[datum.A] == sys.AttrTypeRef {
-				vae.Insert(datum)
-			}
-		} else {
-			eav.Delete(datum)
-			aev.Delete(datum)
-			_, ok := db.attrUniques[datum.A]
-			if ok {
-				ave.Delete(datum)
-			}
-			if db.attrTypes[datum.A] == sys.AttrTypeRef {
-				vae.Delete(datum)
-			}
-		}
+		data = append(data, datum)
 	}
+	// We now have datums with resolved or assigned ids and consistent avs.
+	// TODO We need to enforce uniquness now.
 	if res.Error != nil {
-		db.nextID = res.ID
-		res.NewIDs = nil
-	} else {
-		res.ID = t
+		eav := db.eav.Clone()
+		aev := db.aev.Clone()
+		// TODO could defer this clone until we know we need it
+		ave := db.aev.Clone()
+		// TODO could defer this clone until we know we need it
+		vae := db.vae.Clone()
+	DATA:
+		for i, datum := range data {
+			// TODO we could transact datums into the indexes concurrently after we have resolved all claims
+			claim := req.Claims[i]
+			if !claim.Retract {
+				unique := db.attrUniques[datum.A]
+				if unique != 0 {
+					d, ok := ave.First(index.AV, *datum)
+					if ok {
+						switch unique {
+						case sys.AttrUniqueIdentity:
+							// TODO we have to reassign fully, including datums we may have already written, ugh
+							// this means we really do want to walk the claims first, translating to datums, then
+							// walk the datums, transacting
+						case sys.AttrUniqueValue:
+							res.Error = NewError("database.write.uniqueValueCollision", "datum", datum, "extant", d)
+							break DATA
+						}
+					}
+				}
+				_, ok := db.attrCardManies[datum.A]
+				if !ok {
+					// if this is cardinality one, we must replace extant datum if ea but not v
+					d, ok := eav.First(index.EA, *datum)
+					if ok {
+						if d.V == datum.V {
+							continue
+						} else {
+							eav.Delete(d)
+							aev.Delete(d)
+							_, ok := db.attrUniques[datum.A]
+							if ok {
+								ave.Delete(d)
+							}
+							if db.attrTypes[datum.A] == sys.AttrTypeRef {
+								vae.Delete(d)
+							}
+						}
+					}
+				}
+				eav.Insert(*datum)
+				aev.Insert(*datum)
+				_, ok = db.attrUniques[datum.A]
+				if ok {
+					ave.Insert(*datum)
+				}
+				if db.attrTypes[datum.A] == sys.AttrTypeRef {
+					vae.Insert(*datum)
+				}
+			} else {
+				eav.Delete(*datum)
+				aev.Delete(*datum)
+				_, ok := db.attrUniques[datum.A]
+				if ok {
+					ave.Delete(*datum)
+				}
+				if db.attrTypes[datum.A] == sys.AttrTypeRef {
+					vae.Delete(*datum)
+				}
+			}
+		}
 		db.eav = eav
 		db.aev = aev
 		db.ave = ave
 		db.vae = vae
 	}
+	if res.Error != nil {
+		res.ID = 0
+		db.nextID = lastID
+		res.NewIDs = nil
+	}
 	res.Snapshot = db.read()
+	return
+}
+
+func (db *indexDatabase) evaluateClaim(res *Response, assigned map[ID]TempID, claim *Claim) (datum *Datum) {
+	datum = &Datum{T: res.ID}
+	switch e := claim.E.(type) {
+	case ID:
+		if e == 0 || e >= res.ID {
+			res.Error = NewError("database.write.invalidE", "e", e)
+		}
+		datum.E = e
+	case Ident:
+		datum.E = db.idents[e]
+		if datum.E == 0 {
+			res.Error = NewError("database.write.invalidE", "e", e)
+		}
+	case LookupRef:
+		datum.E = db.resolveLookupRef(e)
+		if datum.E == 0 {
+			res.Error = NewError("database.write.invalidE", "e", e)
+		}
+	case TempID:
+		datum.E = res.NewIDs[e]
+		if datum.E == 0 {
+			datum.E = db.allocateID()
+			res.NewIDs[e] = datum.E
+			assigned[datum.E] = e
+		}
+	case TxnID:
+		datum.E = res.ID
+	default:
+		res.Error = NewError("database.write.invalidE", "e", e)
+	}
+	if res.Error != nil {
+		return
+	}
+	switch a := claim.A.(type) {
+	case ID:
+		if a == 0 || a >= res.ID {
+			res.Error = NewError("database.write.invalidA", "a", a)
+		}
+		datum.A = a
+	case Ident:
+		datum.A = db.idents[a]
+		if datum.A == 0 {
+			res.Error = NewError("database.write.invalidA", "a", a)
+		}
+	case LookupRef:
+		datum.A = db.resolveLookupRef(a)
+		if datum.A == 0 {
+			res.Error = NewError("database.write.invalidA", "a", a)
+		}
+	default:
+		res.Error = NewError("database.write.invalidA", "a", a)
+	}
+	if res.Error != nil {
+		return
+	}
+	switch v := claim.V.(type) {
+	case Ident:
+		found := false
+		datum.V, found = db.idents[v]
+		if !found {
+			res.Error = NewError("database.write.invalidV", "v", v)
+		}
+	case TempID:
+		id := res.NewIDs[v]
+		if id == 0 {
+			// TODO is it okay if there are no claim e's that correspond to this?
+			id = db.allocateID()
+			res.NewIDs[v] = id
+			assigned[id] = v
+		}
+		datum.V = id
+	case LookupRef:
+		id := db.resolveLookupRef(v)
+		if id == 0 {
+			res.Error = NewError("database.write.invalidV", "v", v)
+		}
+		datum.V = id
+	default:
+		ok := false
+		// TODO we could make ourselves a typed datum right here if we want to commit to that
+		// instead of the composite index abstraction, avoiding an intermediate struct thereby.
+		datum.V, ok = v.(Value)
+		if !ok {
+			res.Error = NewError("database.write.invalidV", "v", v)
+		}
+	}
+	if res.Error != nil {
+		return
+	}
+	if !sys.ValidValue(db.attrTypes[datum.A], datum.V) {
+		res.Error = NewError("database.write.inconsistentAV", "datum", datum)
+	}
 	return
 }
 
