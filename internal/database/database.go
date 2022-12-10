@@ -101,47 +101,53 @@ func (db *indexDatabase) read() (snapshot Snapshot) {
 func (db *indexDatabase) Write(req Request) (res Response) {
 	res.NewIDs = map[TempID]ID{}
 	assigned := map[ID]TempID{}
+	rewrites := map[ID]ID{}
 	db.lock.Lock()
 	defer db.lock.Unlock()
 	lastID := db.nextID
 	res.ID = db.allocateID()
 	data := make([]*Datum, 0, len(req.Claims))
+CLAIMS:
 	for _, claim := range req.Claims {
 		datum := db.evaluateClaim(&res, assigned, claim)
 		if res.Error != nil {
 			break
 		}
+		if !claim.Retract {
+			unique := db.attrUniques[datum.A]
+			if unique != 0 {
+				// TODO First is not returning the value we expect here :(
+				d, ok := db.ave.First(index.AV, *datum)
+				if ok {
+					switch unique {
+					case sys.AttrUniqueIdentity:
+						_, ok := rewrites[datum.E]
+						if ok {
+							res.Error = NewError("database.write.uniqueValueImpossible", "datum", datum)
+							break CLAIMS
+						}
+						rewrites[datum.E] = d.E
+					case sys.AttrUniqueValue:
+						res.Error = NewError("database.write.uniqueValueCollision", "datum", datum, "extant", d)
+						break CLAIMS
+					}
+				}
+			}
+		}
 		data = append(data, datum)
 	}
 	// We now have datums with resolved or assigned ids and consistent avs.
-	// TODO We need to enforce uniquness now.
-	if res.Error != nil {
+	if res.Error == nil {
 		eav := db.eav.Clone()
 		aev := db.aev.Clone()
 		// TODO could defer this clone until we know we need it
 		ave := db.aev.Clone()
 		// TODO could defer this clone until we know we need it
 		vae := db.vae.Clone()
-	DATA:
 		for i, datum := range data {
 			// TODO we could transact datums into the indexes concurrently after we have resolved all claims
 			claim := req.Claims[i]
 			if !claim.Retract {
-				unique := db.attrUniques[datum.A]
-				if unique != 0 {
-					d, ok := ave.First(index.AV, *datum)
-					if ok {
-						switch unique {
-						case sys.AttrUniqueIdentity:
-							// TODO we have to reassign fully, including datums we may have already written, ugh
-							// this means we really do want to walk the claims first, translating to datums, then
-							// walk the datums, transacting
-						case sys.AttrUniqueValue:
-							res.Error = NewError("database.write.uniqueValueCollision", "datum", datum, "extant", d)
-							break DATA
-						}
-					}
-				}
 				_, ok := db.attrCardManies[datum.A]
 				if !ok {
 					// if this is cardinality one, we must replace extant datum if ea but not v
