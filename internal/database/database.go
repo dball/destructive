@@ -19,7 +19,7 @@ type indexDatabase struct {
 	attrsByID      map[ID]Attr
 	attrsByIdent   map[Ident]Attr
 	attrTypes      map[ID]ID
-	attrUniques    map[ID]Void
+	attrUniques    map[ID]ID
 	attrCardManies map[ID]Void
 	idents         map[Ident]ID
 
@@ -34,7 +34,7 @@ func NewIndexDatabase(degree int, attrsSize int, identsSize int) (db Database) {
 	attrsByID := make(map[ID]Attr, attrsSize)
 	attrsByIdent := make(map[Ident]Attr, attrsSize)
 	attrTypes := make(map[ID]ID, attrsSize)
-	attrUniques := make(map[ID]Void, attrsSize)
+	attrUniques := make(map[ID]ID, attrsSize)
 	attrCardManies := make(map[ID]Void, attrsSize)
 	idents := make(map[Ident]ID, identsSize)
 	for id, attr := range sys.Attrs {
@@ -42,7 +42,7 @@ func NewIndexDatabase(degree int, attrsSize int, identsSize int) (db Database) {
 		attrsByIdent[attr.Ident] = attr
 		attrTypes[id] = attr.Type
 		if attr.Unique != 0 {
-			attrUniques[id] = Void{}
+			attrUniques[id] = attr.Unique
 		}
 		if attr.Cardinality == sys.AttrCardinalityMany {
 			attrCardManies[id] = Void{}
@@ -100,6 +100,7 @@ func (db *indexDatabase) read() (snapshot Snapshot) {
 
 func (db *indexDatabase) Write(req Request) (res Response) {
 	res.NewIDs = map[TempID]ID{}
+	assigned := map[ID]TempID{}
 	db.lock.Lock()
 	defer db.lock.Unlock()
 	eav := db.eav.Clone()
@@ -180,6 +181,7 @@ CLAIMS:
 				// TODO is it okay if there are no claim e's that correspond to this?
 				id = db.allocateID()
 				res.NewIDs[v] = id
+				assigned[id] = v
 			}
 			datum.V = id
 		case LookupRef:
@@ -205,6 +207,21 @@ CLAIMS:
 		}
 		// TODO we could transact datums into the indexes concurrently after we have resolved all claims
 		if !claim.Retract {
+			unique := db.attrUniques[datum.A]
+			if unique != 0 {
+				d, ok := ave.First(index.AV, datum)
+				if ok {
+					switch unique {
+					case sys.AttrUniqueIdentity:
+						// TODO we have to reassign fully, including datums we may have already written, ugh
+						// this means we really do want to walk the claims first, translating to datums, then
+						// walk the datums, transacting
+					case sys.AttrUniqueValue:
+						res.Error = NewError("database.write.uniqueValueCollision", "datum", datum, "extant", d)
+						break CLAIMS
+					}
+				}
+			}
 			_, ok := db.attrCardManies[datum.A]
 			if !ok {
 				// if this is cardinality one, we must replace extant datum if ea but not v
