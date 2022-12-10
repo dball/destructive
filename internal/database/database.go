@@ -16,11 +16,12 @@ type indexDatabase struct {
 	ave index.Index
 	vae index.Index
 
-	attrsByID    map[ID]Attr
-	attrsByIdent map[Ident]Attr
-	attrTypes    map[ID]ID
-	idents       map[Ident]ID
-	uniqueAttrs  map[ID]Void
+	attrsByID      map[ID]Attr
+	attrsByIdent   map[Ident]Attr
+	attrTypes      map[ID]ID
+	attrUniques    map[ID]Void
+	attrCardManies map[ID]Void
+	idents         map[Ident]ID
 
 	lock   sync.RWMutex
 	nextID ID
@@ -33,14 +34,18 @@ func NewIndexDatabase(degree int, attrsSize int, identsSize int) (db Database) {
 	attrsByID := make(map[ID]Attr, attrsSize)
 	attrsByIdent := make(map[Ident]Attr, attrsSize)
 	attrTypes := make(map[ID]ID, attrsSize)
+	attrUniques := make(map[ID]Void, attrsSize)
+	attrCardManies := make(map[ID]Void, attrsSize)
 	idents := make(map[Ident]ID, identsSize)
-	uniqueAttrs := make(map[ID]Void, attrsSize)
 	for id, attr := range sys.Attrs {
 		attrsByID[id] = attr
 		attrsByIdent[attr.Ident] = attr
 		attrTypes[id] = attr.Type
 		if attr.Unique != 0 {
-			uniqueAttrs[id] = Void{}
+			attrUniques[id] = Void{}
+		}
+		if attr.Cardinality == sys.AttrCardinalityMany {
+			attrCardManies[id] = Void{}
 		}
 	}
 	for ident, id := range sys.Idents {
@@ -55,7 +60,7 @@ func NewIndexDatabase(degree int, attrsSize int, identsSize int) (db Database) {
 	for _, datum := range sys.Datums {
 		eav.Insert(datum)
 		aev.Insert(datum)
-		_, ok := uniqueAttrs[datum.A]
+		_, ok := attrUniques[datum.A]
 		if ok {
 			ave.Insert(datum)
 		}
@@ -64,16 +69,17 @@ func NewIndexDatabase(degree int, attrsSize int, identsSize int) (db Database) {
 		}
 	}
 	db = &indexDatabase{
-		eav:          eav,
-		aev:          aev,
-		ave:          ave,
-		vae:          vae,
-		attrsByID:    attrsByID,
-		attrsByIdent: attrsByIdent,
-		attrTypes:    attrTypes,
-		idents:       idents,
-		uniqueAttrs:  uniqueAttrs,
-		nextID:       sys.FirstUserID,
+		eav:            eav,
+		aev:            aev,
+		ave:            ave,
+		vae:            vae,
+		attrsByID:      attrsByID,
+		attrsByIdent:   attrsByIdent,
+		attrTypes:      attrTypes,
+		attrUniques:    attrUniques,
+		attrCardManies: attrCardManies,
+		idents:         idents,
+		nextID:         sys.FirstUserID,
 	}
 	return
 }
@@ -199,10 +205,29 @@ CLAIMS:
 		}
 		// TODO we could transact datums into the indexes concurrently after we have resolved all claims
 		if !claim.Retract {
-			// TODO if this is cardinality one, we must replace extant datum if ea but not v
+			_, ok := db.attrCardManies[datum.A]
+			if !ok {
+				// if this is cardinality one, we must replace extant datum if ea but not v
+				d, ok := eav.First(index.EA, datum)
+				if ok {
+					if d.V == datum.V {
+						continue
+					} else {
+						eav.Delete(d)
+						aev.Delete(d)
+						_, ok := db.attrUniques[datum.A]
+						if ok {
+							ave.Delete(d)
+						}
+						if db.attrTypes[datum.A] == sys.AttrTypeRef {
+							vae.Delete(d)
+						}
+					}
+				}
+			}
 			eav.Insert(datum)
 			aev.Insert(datum)
-			_, ok := db.uniqueAttrs[datum.A]
+			_, ok = db.attrUniques[datum.A]
 			if ok {
 				ave.Insert(datum)
 			}
@@ -212,7 +237,7 @@ CLAIMS:
 		} else {
 			eav.Delete(datum)
 			aev.Delete(datum)
-			_, ok := db.uniqueAttrs[datum.A]
+			_, ok := db.attrUniques[datum.A]
 			if ok {
 				ave.Delete(datum)
 			}

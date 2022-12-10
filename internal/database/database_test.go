@@ -10,6 +10,7 @@ import (
 
 func TestWriteSimple(t *testing.T) {
 	db := NewIndexDatabase(32, 64, 64)
+	var e, tx ID
 	req := Request{
 		Claims: []*Claim{
 			{E: TempID("1"), A: sys.DbIdent, V: String("test/ident")},
@@ -20,6 +21,13 @@ func TestWriteSimple(t *testing.T) {
 	assert.Positive(t, res.ID)
 	assert.Equal(t, map[TempID]ID{TempID("1"): sys.FirstUserID + 1}, res.NewIDs)
 	assert.NotNil(t, res.Snapshot)
+	e = res.NewIDs[TempID("1")]
+	tx = res.ID
+
+	res = db.Write(req)
+	assert.NoError(t, res.Error)
+	assert.Equal(t, e, res.NewIDs[TempID("1")])
+	assert.NotEqual(t, tx, res.ID)
 }
 
 func TestWriteAttr(t *testing.T) {

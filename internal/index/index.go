@@ -84,6 +84,8 @@ type Index interface {
 	// Select returns an iterator of datums that match the given datum according to the partial
 	// index.
 	Select(p PartialIndex, datum Datum) (iter *iterator.Iterator[Datum])
+	// First returns the first datum matching the partial index, if any.
+	First(p PartialIndex, datum Datum) (match Datum, extant bool)
 	// Clone returns a copy of the index. Both instances are hereafter safe to change without affecting
 	// the other.
 	Clone() (clone Index)
@@ -361,6 +363,96 @@ func (idx *CompositeIndex) Select(p PartialIndex, datum Datum) (iter *iterator.I
 	return
 }
 
+func (idx *CompositeIndex) First(p PartialIndex, datum Datum) (match Datum, extant bool) {
+	// TODO should idx ensure p is legit for its type? This would just be a cross check against the
+	// database misusing its indexes.
+	if p == E {
+		// TODO a order is quite important here, right, even though we're never going to need this case
+		match, extant = idx.strings.First(CompareE[string], stringValuer.valuer, TypedDatum[string]{E: datum.E})
+		if extant {
+			return
+		}
+		match, extant = idx.ints.First(CompareE[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E})
+		if extant {
+			return
+		}
+		match, extant = idx.uints.First(CompareE[uint64], refValuer.valuer, TypedDatum[uint64]{E: datum.E})
+		if extant {
+			return
+		}
+		match, extant = idx.floats.First(CompareE[float64], floatValuer.valuer, TypedDatum[float64]{E: datum.E})
+		return
+	}
+	switch idx.attrTypes[datum.A] {
+	case sys.AttrTypeString:
+		switch p {
+		case EA:
+			match, extant = idx.strings.First(CompareEA[string], stringValuer.valuer, TypedDatum[string]{E: datum.E, A: datum.A})
+		case AE:
+			match, extant = idx.strings.First(CompareAE[string], stringValuer.valuer, TypedDatum[string]{E: datum.E, A: datum.A})
+		case A:
+			match, extant = idx.strings.First(CompareA[string], stringValuer.valuer, TypedDatum[string]{A: datum.A})
+		case AV:
+			match, extant = idx.strings.First(CompareAV[string], stringValuer.valuer, TypedDatum[string]{A: datum.A, V: stringValuer.devaluer(datum.V)})
+		}
+	case sys.AttrTypeInt:
+		switch p {
+		case EA:
+			match, extant = idx.ints.First(CompareEA[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A})
+		case AE:
+			match, extant = idx.ints.First(CompareAE[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A})
+		case A:
+			match, extant = idx.ints.First(CompareA[int64], intValuer.valuer, TypedDatum[int64]{A: datum.A})
+		case AV:
+			match, extant = idx.ints.First(CompareAV[int64], intValuer.valuer, TypedDatum[int64]{A: datum.A, V: intValuer.devaluer(datum.V)})
+		}
+	case sys.AttrTypeRef:
+		switch p {
+		case EA:
+			match, extant = idx.uints.First(CompareEA[uint64], refValuer.valuer, TypedDatum[uint64]{E: datum.E, A: datum.A})
+		case AE:
+			match, extant = idx.uints.First(CompareAE[uint64], refValuer.valuer, TypedDatum[uint64]{E: datum.E, A: datum.A})
+		case A:
+			match, extant = idx.uints.First(CompareA[uint64], refValuer.valuer, TypedDatum[uint64]{A: datum.A})
+		case AV:
+			match, extant = idx.uints.First(CompareAV[uint64], refValuer.valuer, TypedDatum[uint64]{A: datum.A, V: refValuer.devaluer(datum.V)})
+		}
+	case sys.AttrTypeFloat:
+		switch p {
+		case EA:
+			match, extant = idx.floats.First(CompareEA[float64], floatValuer.valuer, TypedDatum[float64]{E: datum.E, A: datum.A})
+		case AE:
+			match, extant = idx.floats.First(CompareAE[float64], floatValuer.valuer, TypedDatum[float64]{E: datum.E, A: datum.A})
+		case A:
+			match, extant = idx.floats.First(CompareA[float64], floatValuer.valuer, TypedDatum[float64]{A: datum.A})
+		case AV:
+			match, extant = idx.floats.First(CompareAV[float64], floatValuer.valuer, TypedDatum[float64]{A: datum.A, V: floatValuer.devaluer(datum.V)})
+		}
+	case sys.AttrTypeBool:
+		switch p {
+		case EA:
+			match, extant = idx.uints.First(CompareEA[uint64], boolValuer.valuer, TypedDatum[uint64]{E: datum.E, A: datum.A})
+		case AE:
+			match, extant = idx.uints.First(CompareAE[uint64], boolValuer.valuer, TypedDatum[uint64]{E: datum.E, A: datum.A})
+		case A:
+			match, extant = idx.uints.First(CompareA[uint64], boolValuer.valuer, TypedDatum[uint64]{A: datum.A})
+		case AV:
+			match, extant = idx.uints.First(CompareAV[uint64], boolValuer.valuer, TypedDatum[uint64]{A: datum.A, V: boolValuer.devaluer(datum.V)})
+		}
+	case sys.AttrTypeInst:
+		switch p {
+		case EA:
+			match, extant = idx.ints.First(CompareEA[int64], instValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A})
+		case AE:
+			match, extant = idx.ints.First(CompareAE[int64], instValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A})
+		case A:
+			match, extant = idx.ints.First(CompareA[int64], instValuer.valuer, TypedDatum[int64]{A: datum.A})
+		case AV:
+			match, extant = idx.ints.First(CompareAV[int64], instValuer.valuer, TypedDatum[int64]{A: datum.A, V: instValuer.devaluer(datum.V)})
+		}
+	}
+	return
+}
 func (idx *CompositeIndex) Clone() (clone Index) {
 	clone = &CompositeIndex{
 		attrTypes: idx.attrTypes,

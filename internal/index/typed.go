@@ -43,6 +43,10 @@ type TypedIndex[X constraints.Ordered] interface {
 	// ordered set for which the comparer returns 0. The v values of those datums are converted from
 	// indexed storage values to datum Values with the valuer function.
 	Select(comparer Comparer[X], valuer Valuer[X], datum TypedDatum[X]) (iter *iterator.Iterator[Datum])
+	// First returns the first datum after the point datum would occupy in the ordered set for which
+	// the comparer returns 0, if any. The v value of the datum is converted from indexed storage
+	// value to datum Value with the valuer function.
+	First(comparer Comparer[X], valuer Valuer[X], datum TypedDatum[X]) (match Datum, extant bool)
 }
 
 type btreeIndex[X constraints.Ordered] struct {
@@ -105,4 +109,15 @@ func (sel *selection[X]) Each(accept iterator.Accept[Datum]) {
 
 func (idx *btreeIndex[X]) Select(comparer Comparer[X], valuer Valuer[X], datum TypedDatum[X]) (iter *iterator.Iterator[Datum]) {
 	return iterator.BuildIterator[Datum](&selection[X]{idx, comparer, datum, valuer})
+}
+
+func (idx *btreeIndex[X]) First(comparer Comparer[X], valuer Valuer[X], datum TypedDatum[X]) (match Datum, extant bool) {
+	idx.tree.AscendGreaterOrEqual(datum, func(d TypedDatum[X]) bool {
+		if comparer(datum, d) == 0 {
+			match = Datum{E: d.E, A: d.A, V: valuer(d.V), T: d.T}
+			extant = true
+		}
+		return false
+	})
+	return
 }
