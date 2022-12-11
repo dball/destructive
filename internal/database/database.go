@@ -452,7 +452,19 @@ func (db *indexDatabase) allocateID() (id ID) {
 }
 
 func (db *indexDatabase) resolveLookupRef(ref LookupRef) (id ID) {
-	// TODO need ave index
+	datum := Datum{V: ref.V}
+	switch a := ref.A.(type) {
+	case ID:
+		datum.A = a
+	case Ident:
+		datum.A = db.idents[a]
+	default:
+		return
+	}
+	match, ok := db.ave.First(index.AV, datum)
+	if ok {
+		id = match.E
+	}
 	return
 }
 
