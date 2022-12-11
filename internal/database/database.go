@@ -107,7 +107,6 @@ func (db *indexDatabase) read() (snapshot Snapshot) {
 
 func (db *indexDatabase) Write(req Request) (res Response) {
 	res.NewIDs = map[TempID]ID{}
-	assigned := map[ID]TempID{}
 	rewrites := map[ID]ID{}
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -119,7 +118,7 @@ func (db *indexDatabase) Write(req Request) (res Response) {
 	identDeletes := map[ID]Ident{}
 CLAIMS:
 	for _, claim := range req.Claims {
-		datum := db.evaluateClaim(&res, assigned, claim)
+		datum := db.evaluateClaim(&res, claim)
 		if res.Error != nil {
 			break
 		}
@@ -350,7 +349,7 @@ CLAIMS:
 	return
 }
 
-func (db *indexDatabase) evaluateClaim(res *Response, assigned map[ID]TempID, claim *Claim) (datum *Datum) {
+func (db *indexDatabase) evaluateClaim(res *Response, claim *Claim) (datum *Datum) {
 	datum = &Datum{T: res.ID}
 	switch e := claim.E.(type) {
 	case ID:
@@ -373,7 +372,6 @@ func (db *indexDatabase) evaluateClaim(res *Response, assigned map[ID]TempID, cl
 		if datum.E == 0 {
 			datum.E = db.allocateID()
 			res.NewIDs[e] = datum.E
-			assigned[datum.E] = e
 		}
 	case TxnID:
 		datum.E = res.ID
@@ -418,7 +416,6 @@ func (db *indexDatabase) evaluateClaim(res *Response, assigned map[ID]TempID, cl
 			// TODO is it okay if there are no claim e's that correspond to this?
 			id = db.allocateID()
 			res.NewIDs[v] = id
-			assigned[id] = v
 		}
 		datum.V = id
 	case LookupRef:
