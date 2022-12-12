@@ -94,12 +94,22 @@ func (db *indexDatabase) Read() (snapshot Snapshot) {
 }
 
 func (db *indexDatabase) read() (snapshot Snapshot) {
+	idents := make(map[Ident]ID, len(db.idents))
+	for ident, id := range db.idents {
+		idents[ident] = id
+	}
+	attrs := make(map[ID]Attr, len(db.attrsByID))
+	for id, attr := range db.attrsByID {
+		attrs[id] = attr
+	}
 	snapshot = &indexSnapshot{
 		eav: db.eav.Clone(),
 		aev: db.aev.Clone(),
 		ave: db.ave.Clone(),
 		vae: db.vae.Clone(),
-		// TODO idents and attrs, probably
+		// These are probably more expensive to copy than the btrees. Maybe we could do cow here?
+		idents: idents,
+		attrs:  attrs,
 	}
 	return
 }
@@ -240,7 +250,7 @@ CLAIMS:
 			res.Error = NewError("database.write.invalidAttrCardinality", "attr", attr)
 			break
 		}
-		if !sys.ValidUnique(attr.Unique) {
+		if attr.Unique != 0 && !sys.ValidUnique(attr.Unique) {
 			res.Error = NewError("database.write.invalidAttrUnique", "attr", attr)
 			break
 		}
