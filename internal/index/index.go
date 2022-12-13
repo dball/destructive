@@ -115,7 +115,7 @@ var intValuer TypeValuer[int64] = TypeValuer[int64]{
 	devaluer: func(value Value) (v int64) { return int64(value.(Int)) },
 }
 var refValuer TypeValuer[uint64] = TypeValuer[uint64]{
-	valuer:   func(v uint64) (value Value) { return Int(v) },
+	valuer:   func(v uint64) (value Value) { return ID(v) },
 	devaluer: func(value Value) (v uint64) { return uint64(value.(ID)) },
 }
 var floatValuer TypeValuer[float64] = TypeValuer[float64]{
