@@ -46,6 +46,10 @@ func TestWriteAttr(t *testing.T) {
 	assert.NoError(t, Declare(db,
 		Attr{Ident: "person/name", Type: sys.AttrTypeString, Unique: sys.AttrUniqueIdentity},
 	))
+	assert.NoError(t, Declare(db,
+		Attr{Ident: "person/name", Type: sys.AttrTypeString, Unique: sys.AttrUniqueIdentity},
+	))
+
 	req := Request{
 		Claims: []*Claim{
 			{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
