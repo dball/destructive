@@ -68,7 +68,25 @@ func (snapshot *indexSnapshot) Select(claim Claim) (datums *iterator.Iterator[Da
 
 func (snapshot *indexSnapshot) Find(claim Claim) (match Datum, found bool) {
 	// TODO Find needs to return the datum or at least the t
-	found = snapshot.eav.Find(*snapshot.resolveClaim(&claim))
+	switch e := claim.E.(type) {
+	case ID:
+		match.E = e
+	case Ident:
+		match.E = snapshot.idents[e]
+	case LookupRef:
+		match.E = snapshot.resolveLookupRef(e)
+	}
+	switch a := claim.A.(type) {
+	case ID:
+		match.A = a
+	case Ident:
+		match.A = snapshot.idents[a]
+	}
+	value, ok := claim.V.(Value)
+	if ok {
+		match.V = value
+	}
+	found = snapshot.eav.Find(match)
 	return
 }
 

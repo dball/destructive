@@ -115,18 +115,56 @@ func (db *indexDatabase) read() (snapshot Snapshot) {
 }
 
 func (db *indexDatabase) Write(req Request) (res Response) {
-	res.TempIDs = map[TempID]ID{}
 	rewrites := map[ID]ID{}
 	db.lock.Lock()
 	defer db.lock.Unlock()
-	lastID := db.nextID
-	res.ID = db.allocateID()
-	data := make([]*Datum, 0, len(req.Claims))
 	attrChanges := map[ID]Attr{}
 	identCreates := map[ID]Ident{}
 	identDeletes := map[ID]Ident{}
+	claims := req.Claims
+	if len(req.Retractions) != 0 {
+		ids := make(map[ID]Void, len(req.Retractions))
+		for _, retraction := range req.Retractions {
+			var id ID
+			for ref := range retraction.Constraints {
+				var refID ID
+				switch e := ref.(type) {
+				case ID:
+					refID = e
+				case Ident:
+					refID = db.idents[e]
+				case LookupRef:
+					refID = db.resolveLookupRef(e)
+				}
+				switch {
+				case refID == 0:
+					res.Error = NewError("database.write.invalidE", "retraction", retraction, "ref", ref)
+					return
+				case id == 0:
+					id = refID
+				case id != refID:
+					res.Error = NewError("database.write.inconsistentE", "retraction", retraction, "ref", ref, "id", id)
+					return
+				}
+			}
+			ids[id] = Void{}
+		}
+		for id := range ids {
+			iter := db.eav.Select(index.E, Datum{E: id})
+			for iter.Next() {
+				datum := iter.Value()
+				// We could go straight to the indexes with the datums instead of allocating them anew as claims
+				// but we will need to handle invariant enforcement and cache maintenance differently.
+				claims = append(claims, &Claim{E: datum.E, A: datum.A, V: datum.V.(VRef), Retract: true})
+			}
+		}
+	}
+	lastID := db.nextID
+	res.ID = db.allocateID()
+	res.TempIDs = map[TempID]ID{}
+	data := make([]*Datum, 0, len(claims))
 CLAIMS:
-	for _, claim := range req.Claims {
+	for _, claim := range claims {
 		datum := db.evaluateClaim(&res, claim)
 		if res.Error != nil {
 			break
@@ -265,7 +303,7 @@ CLAIMS:
 		vae := db.vae.Clone()
 		// We could consider transacting into the indexes concurrently.
 		for i, datum := range data {
-			claim := req.Claims[i]
+			claim := claims[i]
 			// TempIDs may have been assigned IDs that subsequently resolved to identity
 			// unique datum ids, so we rewrite them if so.
 			tempid, ok := claim.E.(TempID)
