@@ -18,7 +18,7 @@ type indexSnapshot struct {
 var _ Snapshot = (*indexSnapshot)(nil)
 
 func (snapshot *indexSnapshot) Select(claim Claim) (datums *iterator.Iterator[Datum]) {
-	match := snapshot.resolveClaim(&claim)
+	match := snapshot.resolveClaim(claim)
 	hasE := match.E != 0
 	hasA := match.A != 0
 	hasV := match.V != nil
@@ -28,20 +28,20 @@ func (snapshot *indexSnapshot) Select(claim Claim) (datums *iterator.Iterator[Da
 		case true:
 			switch hasV {
 			case true:
-				found := snapshot.eav.Find(*match)
+				found := snapshot.eav.Find(match)
 				if found {
 					panic("TODO single datum iterator")
 				}
 				panic("TODO empty iterator")
 			case false:
-				datums = snapshot.eav.Select(index.EA, *match)
+				datums = snapshot.eav.Select(index.EA, match)
 			}
 		case false:
 			switch hasV {
 			case true:
 				panic("TODO ev? wtd even maybe select all and filter but should we say it's not indexed?")
 			case false:
-				datums = snapshot.eav.Select(index.E, *match)
+				datums = snapshot.eav.Select(index.E, match)
 			}
 		}
 	case false:
@@ -50,9 +50,9 @@ func (snapshot *indexSnapshot) Select(claim Claim) (datums *iterator.Iterator[Da
 			switch hasV {
 			case true:
 				// TODO validate A is indexed
-				datums = snapshot.ave.Select(index.AV, *match)
+				datums = snapshot.ave.Select(index.AV, match)
 			case false:
-				datums = snapshot.aev.Select(index.A, *match)
+				datums = snapshot.aev.Select(index.A, match)
 			}
 		case false:
 			switch hasV {
@@ -68,24 +68,7 @@ func (snapshot *indexSnapshot) Select(claim Claim) (datums *iterator.Iterator[Da
 
 func (snapshot *indexSnapshot) Find(claim Claim) (match Datum, found bool) {
 	// TODO Find needs to return the datum or at least the t
-	switch e := claim.E.(type) {
-	case ID:
-		match.E = e
-	case Ident:
-		match.E = snapshot.idents[e]
-	case LookupRef:
-		match.E = snapshot.resolveLookupRef(e)
-	}
-	switch a := claim.A.(type) {
-	case ID:
-		match.A = a
-	case Ident:
-		match.A = snapshot.idents[a]
-	}
-	value, ok := claim.V.(Value)
-	if ok {
-		match.V = value
-	}
+	match = snapshot.resolveClaim(claim)
 	found = snapshot.eav.Find(match)
 	return
 }
@@ -112,8 +95,7 @@ func (snapshot *indexSnapshot) resolveLookupRef(ref LookupRef) (id ID) {
 	return
 }
 
-func (snapshot *indexSnapshot) resolveClaim(claim *Claim) (match *Datum) {
-	match = &Datum{}
+func (snapshot *indexSnapshot) resolveClaim(claim Claim) (match Datum) {
 	switch e := claim.E.(type) {
 	case ID:
 		match.E = e
