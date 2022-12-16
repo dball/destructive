@@ -131,6 +131,32 @@ func TestIdentityUnique(t *testing.T) {
 	assert.True(t, ok)
 }
 
+func TestSelect(t *testing.T) {
+	db := NewIndexDatabase(32, 64, 64)
+	assert.NoError(t, Declare(db,
+		Attr{Ident: "person/name", Type: sys.AttrTypeString, Unique: sys.AttrUniqueIdentity},
+		Attr{Ident: "person/age", Type: sys.AttrTypeInt},
+		Attr{Ident: "person/score", Type: sys.AttrTypeFloat},
+	))
+	req := Request{
+		Claims: []*Claim{
+			{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
+			{E: TempID("1"), A: Ident("person/age"), V: Int(49)},
+			{E: TempID("1"), A: Ident("person/score"), V: Float(23.42)},
+		},
+	}
+	res := db.Write(req)
+	assert.NoError(t, res.Error)
+	id := res.TempIDs[TempID("1")]
+	data := res.Snapshot.Select(Claim{E: id}).Drain()
+	// TODO the A 0's aren't right. How do we lookup by ident?
+	assert.Equal(t, []Datum{
+		{E: id, A: 0, V: String("Donald")},
+		{E: id, A: 0, V: Int(49)},
+		{E: id, A: 0, V: Float(23.42)},
+	}, data)
+}
+
 func TestRetract(t *testing.T) {
 	db := NewIndexDatabase(32, 64, 64)
 	assert.NoError(t, Declare(db,

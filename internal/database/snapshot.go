@@ -17,7 +17,7 @@ type indexSnapshot struct {
 
 var _ Snapshot = (*indexSnapshot)(nil)
 
-func (snapshot *indexSnapshot) Select(claim Claim) (datums iterator.Iterator[Datum]) {
+func (snapshot *indexSnapshot) Select(claim Claim) (datums *iterator.Iterator[Datum]) {
 	panic("TODO")
 }
 

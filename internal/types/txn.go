@@ -122,7 +122,7 @@ type Database interface {
 type Snapshot interface {
 	// Select returns an iterator of datums matching the claim. Empty values in the
 	// claim's fields indicate all values will match.
-	Select(claim Claim) iterator.Iterator[Datum]
+	Select(claim Claim) *iterator.Iterator[Datum]
 	// Find returns the datum matching the claim, if any.
 	Find(claim Claim) (match Datum, found bool)
 }
