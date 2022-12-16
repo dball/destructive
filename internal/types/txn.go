@@ -99,10 +99,10 @@ type Request struct {
 
 // Response is the result of trying to apply a request to the database.
 type Response struct {
-	// ID is the id of the transaction which applied the datums.
+	// ID is the id of the transaction which applied the datums, if successful.
 	ID ID
-	// NewIDS is a map of entity ids indexed by their referring tempids.
-	NewIDs map[TempID]ID
+	// TempIDs is a map of entity ids indexed by their referring tempids, if successful.
+	TempIDs map[TempID]ID
 	// Snapshot is the value of the database after applying the datums, or
 	// which rejected the datums.
 	Snapshot Snapshot
@@ -123,5 +123,6 @@ type Snapshot interface {
 	// Select returns an iterator of datums matching the claim. Empty values in the
 	// claim's fields indicate all values will match.
 	Select(claim Claim) iterator.Iterator[Datum]
+	// Find returns the datum matching the claim, if any.
 	Find(claim Claim) (match Datum, found bool)
 }

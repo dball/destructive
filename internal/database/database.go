@@ -115,7 +115,7 @@ func (db *indexDatabase) read() (snapshot Snapshot) {
 }
 
 func (db *indexDatabase) Write(req Request) (res Response) {
-	res.NewIDs = map[TempID]ID{}
+	res.TempIDs = map[TempID]ID{}
 	rewrites := map[ID]ID{}
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -273,7 +273,7 @@ CLAIMS:
 				id, ok := rewrites[datum.E]
 				if ok {
 					datum.E = id
-					res.NewIDs[tempid] = id
+					res.TempIDs[tempid] = id
 				}
 			}
 			tempid, ok = claim.V.(TempID)
@@ -281,7 +281,7 @@ CLAIMS:
 				id, ok := rewrites[datum.V.(ID)]
 				if ok {
 					datum.V = id
-					res.NewIDs[tempid] = id
+					res.TempIDs[tempid] = id
 				}
 			}
 			if !claim.Retract {
@@ -352,7 +352,7 @@ CLAIMS:
 	if res.Error != nil {
 		res.ID = 0
 		db.nextID = lastID
-		res.NewIDs = nil
+		res.TempIDs = nil
 	}
 	res.Snapshot = db.read()
 	return
@@ -377,10 +377,10 @@ func (db *indexDatabase) evaluateClaim(res *Response, claim *Claim) (datum *Datu
 			res.Error = NewError("database.write.invalidE", "e", e)
 		}
 	case TempID:
-		datum.E = res.NewIDs[e]
+		datum.E = res.TempIDs[e]
 		if datum.E == 0 {
 			datum.E = db.allocateID()
-			res.NewIDs[e] = datum.E
+			res.TempIDs[e] = datum.E
 		}
 	case TxnID:
 		datum.E = res.ID
@@ -420,11 +420,11 @@ func (db *indexDatabase) evaluateClaim(res *Response, claim *Claim) (datum *Datu
 			res.Error = NewError("database.write.invalidV", "v", v)
 		}
 	case TempID:
-		id := res.NewIDs[v]
+		id := res.TempIDs[v]
 		if id == 0 {
 			// TODO is it okay if there are no claim e's that correspond to this?
 			id = db.allocateID()
-			res.NewIDs[v] = id
+			res.TempIDs[v] = id
 		}
 		datum.V = id
 	case LookupRef:

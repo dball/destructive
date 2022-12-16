@@ -19,9 +19,9 @@ func TestWriteSimple(t *testing.T) {
 	res := db.Write(req)
 	assert.NoError(t, res.Error)
 	assert.Positive(t, res.ID)
-	assert.Equal(t, map[TempID]ID{TempID("1"): sys.FirstUserID + 1}, res.NewIDs)
+	assert.Equal(t, map[TempID]ID{TempID("1"): sys.FirstUserID + 1}, res.TempIDs)
 	assert.NotNil(t, res.Snapshot)
-	e = res.NewIDs[TempID("1")]
+	e = res.TempIDs[TempID("1")]
 	tx = res.ID
 
 	match, ok := res.Snapshot.Find(Claim{E: e, A: sys.DbIdent, V: String("test/ident")})
@@ -34,7 +34,7 @@ func TestWriteSimple(t *testing.T) {
 
 	res = db.Write(req)
 	assert.NoError(t, res.Error)
-	assert.Equal(t, e, res.NewIDs[TempID("1")])
+	assert.Equal(t, e, res.TempIDs[TempID("1")])
 	assert.NotEqual(t, tx, res.ID)
 	match, ok = res.Snapshot.Find(Claim{E: e, A: sys.DbIdent, V: String("test/ident")})
 	assert.True(t, ok)
@@ -58,7 +58,7 @@ func TestWriteAttr(t *testing.T) {
 	res := db.Write(req)
 	assert.NoError(t, res.Error)
 	assert.Positive(t, res.ID)
-	id := res.NewIDs[TempID("1")]
+	id := res.TempIDs[TempID("1")]
 	assert.Positive(t, id)
 	assert.NotNil(t, res.Snapshot)
 }
@@ -80,7 +80,7 @@ func TestEnforceValueUnique(t *testing.T) {
 	}
 	res := db.Write(req)
 	assert.NoError(t, res.Error)
-	id := res.NewIDs[TempID("1")]
+	id := res.TempIDs[TempID("1")]
 	assert.Positive(t, id)
 
 	req = Request{
@@ -109,7 +109,7 @@ func TestIdentityUnique(t *testing.T) {
 	}
 	res := db.Write(req)
 	assert.NoError(t, res.Error)
-	id := res.NewIDs[TempID("1")]
+	id := res.TempIDs[TempID("1")]
 	assert.Positive(t, id)
 	_, ok := res.Snapshot.Find(Claim{E: id, A: Ident("person/age"), V: Int(49)})
 	assert.True(t, ok)
@@ -122,11 +122,38 @@ func TestIdentityUnique(t *testing.T) {
 	}
 	res = db.Write(req)
 	assert.NoError(t, res.Error)
-	assert.Equal(t, id, res.NewIDs[TempID("1")])
+	assert.Equal(t, id, res.TempIDs[TempID("1")])
 	_, ok = res.Snapshot.Find(Claim{E: id, A: Ident("person/age"), V: Int(50)})
 	assert.True(t, ok)
 	_, ok = res.Snapshot.Find(Claim{E: id, A: Ident("person/score"), V: Float(23.42)})
 	assert.True(t, ok)
 	_, ok = res.Snapshot.Find(Claim{E: LookupRef{A: Ident("person/name"), V: String("Donald")}, A: Ident("person/age"), V: Int(50)})
 	assert.True(t, ok)
+}
+
+func TestRetract(t *testing.T) {
+	db := NewIndexDatabase(32, 64, 64)
+	assert.NoError(t, Declare(db,
+		Attr{Ident: "person/name", Type: sys.AttrTypeString, Unique: sys.AttrUniqueIdentity},
+		Attr{Ident: "person/age", Type: sys.AttrTypeInt},
+		Attr{Ident: "person/score", Type: sys.AttrTypeFloat},
+	))
+	req := Request{
+		Claims: []*Claim{
+			{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
+			{E: TempID("1"), A: Ident("person/age"), V: Int(49)},
+			{E: TempID("1"), A: Ident("person/score"), V: Float(23.42)},
+		},
+	}
+	res := db.Write(req)
+	assert.NoError(t, res.Error)
+	req = Request{
+		Retractions: []*Retraction{
+			{Constraints: map[IDRef]Void{LookupRef{A: Ident("person/name"), V: String("Donald")}: {}}},
+		},
+	}
+	res = db.Write(req)
+	assert.NoError(t, res.Error)
+	_, ok := res.Snapshot.Find(Claim{E: LookupRef{A: Ident("person/name"), V: String("Donald")}, A: Ident("person/age"), V: Int(49)})
+	assert.False(t, ok)
 }
