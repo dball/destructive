@@ -72,6 +72,11 @@ func (snapshot *indexSnapshot) Find(claim Claim) (match Datum, found bool) {
 	return
 }
 
+func (snapshot *indexSnapshot) ResolveIdent(ident Ident) (id ID) {
+	id = snapshot.idents[ident]
+	return
+}
+
 func (snapshot *indexSnapshot) resolveLookupRef(ref LookupRef) (id ID) {
 	datum := Datum{V: ref.V}
 	switch a := ref.A.(type) {

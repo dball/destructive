@@ -125,4 +125,6 @@ type Snapshot interface {
 	Select(claim Claim) *iterator.Iterator[Datum]
 	// Find returns the datum matching the claim, if any.
 	Find(claim Claim) (match Datum, found bool)
+	// ResolveIdent resolves an ident to an id.
+	ResolveIdent(ident Ident) (id ID)
 }

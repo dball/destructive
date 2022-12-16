@@ -147,13 +147,15 @@ func TestSelect(t *testing.T) {
 	}
 	res := db.Write(req)
 	assert.NoError(t, res.Error)
+	tx := res.ID
 	id := res.TempIDs[TempID("1")]
-	data := res.Snapshot.Select(Claim{E: id}).Drain()
+	view := res.Snapshot
+	data := view.Select(Claim{E: id}).Drain()
 	// TODO the A 0's aren't right. How do we lookup by ident?
 	assert.Equal(t, []Datum{
-		{E: id, A: 0, V: String("Donald")},
-		{E: id, A: 0, V: Int(49)},
-		{E: id, A: 0, V: Float(23.42)},
+		{E: id, A: view.ResolveIdent(Ident("person/name")), V: String("Donald"), T: tx},
+		{E: id, A: view.ResolveIdent(Ident("person/age")), V: Int(49), T: tx},
+		{E: id, A: view.ResolveIdent(Ident("person/score")), V: Float(23.42), T: tx},
 	}, data)
 }
 
