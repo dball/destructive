@@ -127,4 +127,6 @@ type Snapshot interface {
 	Find(claim Claim) (match Datum, found bool)
 	// ResolveIdent resolves an ident to an id.
 	ResolveIdent(ident Ident) (id ID)
+	// ResolveAttrIdent resolves an attribute id to an ident.
+	ResolveAttrIdent(id ID) (ident Ident)
 }

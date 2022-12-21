@@ -78,6 +78,11 @@ func (snapshot *indexSnapshot) ResolveIdent(ident Ident) (id ID) {
 	return
 }
 
+func (snapshot *indexSnapshot) ResolveAttrIdent(id ID) (ident Ident) {
+	ident = snapshot.attrs[id].Ident
+	return
+}
+
 func (snapshot *indexSnapshot) resolveLookupRef(ref LookupRef) (id ID) {
 	datum := Datum{V: ref.V}
 	switch a := ref.A.(type) {
