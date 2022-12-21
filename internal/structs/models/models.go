@@ -9,6 +9,36 @@ import (
 	. "github.com/dball/destructive/internal/types"
 )
 
+// Analyzer analyzes struct types for attr tags and returns models thereof.
+type Analyzer interface {
+	// Analyze returns a struct model for the given type.
+	Analyze(typ reflect.Type) (model StructModel, err error)
+}
+
+type cachingAnalyzer struct {
+	types map[reflect.Type]*StructModel
+}
+
+var _ Analyzer = (*cachingAnalyzer)(nil)
+
+func (analyzer *cachingAnalyzer) Analyze(typ reflect.Type) (model StructModel, err error) {
+	mp := analyzer.types[typ]
+	if mp != nil {
+		model = *mp
+		return
+	}
+	model, err = Analyze(typ)
+	if err != nil {
+		analyzer.types[typ] = &model
+	}
+	return
+}
+
+// BuildCachingAnalyzer returns an analyzer with a cache of type models.
+func BuildCachingAnalyzer() Analyzer {
+	return &cachingAnalyzer{}
+}
+
 // StructModel models a struct that has fields bound to attributes, whose instances
 // correspond to entities.
 type StructModel struct {
@@ -67,10 +97,6 @@ func (attr AttrFieldModel) IsPointer() bool {
 }
 
 // Analyze builds a struct model for the given type.
-//
-// TODO if the number of types in a runtime are smallish, we could very reasonably
-// provide a global var cache here. It isn't state, AFAICT, it's just a terser
-// representation of a reflected analysis.
 func Analyze(typ reflect.Type) (model StructModel, err error) {
 	if typ.Kind() != reflect.Struct {
 		err = NewError("models.notStruct", "type", typ)

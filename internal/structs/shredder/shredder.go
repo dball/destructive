@@ -23,12 +23,13 @@ type Shredder interface {
 
 // shredder is a stateful shredder.
 type shredder struct {
-	nextID uint64
+	nextID   uint64
+	analyzer models.Analyzer
 }
 
 // NewShredder returns a new shredder.
-func NewShredder() Shredder {
-	return &shredder{nextID: uint64(1)}
+func NewShredder(analyzer models.Analyzer) Shredder {
+	return &shredder{nextID: uint64(1), analyzer: analyzer}
 }
 
 // confetti are the (internal) results of shredding a document. Note that confetti may
@@ -115,7 +116,7 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim,
 		err = NewError("shredder.invalidStruct", "type", typ)
 		return
 	}
-	model, modelErr := models.Analyze(typ)
+	model, modelErr := s.analyzer.Analyze(typ)
 	if modelErr != nil {
 		err = modelErr
 		return
@@ -228,7 +229,7 @@ func (s *shredder) retract(confetti *confetti, x any) (retraction *Retraction, e
 		err = NewError("shredder.invalidStruct", "type", typ)
 		return
 	}
-	model, modelErr := models.Analyze(typ)
+	model, modelErr := s.analyzer.Analyze(typ)
 	if modelErr != nil {
 		err = modelErr
 		return

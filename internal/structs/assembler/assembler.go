@@ -36,6 +36,7 @@ type sliceAwaitingEntry struct {
 }
 
 type assembler[T any] struct {
+	analyzer models.Analyzer
 	// base is a (nil) pointer to a struct of the root entity type
 	base *T
 	// facts are the facts for the assembly, sorted by e
@@ -52,7 +53,7 @@ type assembler[T any] struct {
 	slicesAwaitingEntries map[ID][]sliceAwaitingEntry
 }
 
-func NewAssembler[T any](base *T, facts []Fact) (a *assembler[T], err error) {
+func NewAssembler[T any](analyzer models.Analyzer, base *T, facts []Fact) (a *assembler[T], err error) {
 	ptr := reflect.ValueOf(base)
 	if ptr.Kind() != reflect.Pointer {
 		err = NewError("assembler.baseNotPointer")
@@ -60,6 +61,7 @@ func NewAssembler[T any](base *T, facts []Fact) (a *assembler[T], err error) {
 	}
 	// TODO test that the pointer value type is a struct
 	a = &assembler[T]{
+		analyzer:              analyzer,
 		base:                  base,
 		facts:                 facts,
 		instances:             map[ID]*T{},
@@ -110,7 +112,7 @@ func (a *assembler[T]) assembleAll() (err error) {
 func (a *assembler[T]) assemble(id ID, ptr reflect.Value) (err error) {
 	value := ptr.Elem()
 
-	model, modelErr := models.Analyze(value.Type())
+	model, modelErr := a.analyzer.Analyze(value.Type())
 	if modelErr != nil {
 		err = modelErr
 		return

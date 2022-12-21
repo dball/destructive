@@ -49,7 +49,7 @@ func (db *localDatabase) Read() Snapshot {
 }
 
 func (db *localDatabase) Write(req Request) (res Response) {
-	ireq, err := shredder.NewShredder().Shred(shredder.Document{
+	ireq, err := shredder.NewShredder(models.BuildCachingAnalyzer()).Shred(shredder.Document{
 		Retractions: req.Retractions,
 		Assertions:  req.Assertions,
 	})
@@ -108,7 +108,7 @@ func (snap *localSnapshot) Find(entity any) (found bool) {
 	for _, datum := range datums {
 		facts = append(facts, assembler.Fact{E: datum.E, A: snap.snap.ResolveAttrIdent(datum.A), V: datum.V})
 	}
-	ass, err := assembler.NewAssembler(entity.(*any), facts)
+	ass, err := assembler.NewAssembler(models.BuildCachingAnalyzer(), entity.(*any), facts)
 	if err != nil {
 		return
 	}

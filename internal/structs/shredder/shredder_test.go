@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dball/destructive/internal/structs/models"
 	. "github.com/dball/destructive/internal/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,7 +22,7 @@ func TestShred(t *testing.T) {
 	}
 
 	t.Run("assert", func(t *testing.T) {
-		shredder := NewShredder()
+		shredder := NewShredder(models.BuildCachingAnalyzer())
 		epoch := time.Date(1969, 7, 20, 20, 17, 54, 0, time.UTC)
 		p := person{id: 23, name: "Donald", age: 48, Birthdate: epoch}
 		req, err := shredder.Shred(Document{Assertions: []any{p}})
@@ -38,7 +39,7 @@ func TestShred(t *testing.T) {
 	})
 
 	t.Run("retract", func(t *testing.T) {
-		shredder := NewShredder()
+		shredder := NewShredder(models.BuildCachingAnalyzer())
 		p := person{id: 23, name: "Donald", age: 48}
 		req, err := shredder.Shred(Document{Retractions: []any{p}})
 		assert.NoError(t, err)
@@ -57,7 +58,7 @@ func TestShred(t *testing.T) {
 	})
 
 	t.Run("non-empty uuid", func(t *testing.T) {
-		shredder := NewShredder()
+		shredder := NewShredder(models.BuildCachingAnalyzer())
 		p := person{id: 23, name: "Donald", uuid: "the-uuid"}
 		req, err := shredder.Shred(Document{Assertions: []any{p}})
 		assert.NoError(t, err)
@@ -72,7 +73,7 @@ func TestShred(t *testing.T) {
 	})
 
 	t.Run("pointer value", func(t *testing.T) {
-		shredder := NewShredder()
+		shredder := NewShredder(models.BuildCachingAnalyzer())
 		four := 4
 		epoch := time.Date(1969, 7, 20, 20, 17, 54, 0, time.UTC)
 		p := person{name: "Donald", pets: &four, Deathdate: &epoch}
@@ -90,7 +91,7 @@ func TestShred(t *testing.T) {
 	})
 
 	t.Run("invalid values", func(t *testing.T) {
-		shredder := NewShredder()
+		shredder := NewShredder(models.BuildCachingAnalyzer())
 		_, err := shredder.Shred(Document{Assertions: []any{5}})
 		assert.Error(t, err)
 	})
@@ -103,7 +104,7 @@ func TestRefs(t *testing.T) {
 	}
 
 	t.Run("two mutuals", func(t *testing.T) {
-		shredder := NewShredder()
+		shredder := NewShredder(models.BuildCachingAnalyzer())
 		momo := Person{Name: "Momo"}
 		pabu := Person{Name: "Pabu"}
 		momo.BFF = &pabu
@@ -134,7 +135,7 @@ func TestStructs(t *testing.T) {
 	}
 
 	t.Run("value struct field", func(t *testing.T) {
-		shredder := NewShredder()
+		shredder := NewShredder(models.BuildCachingAnalyzer())
 		me := Person{Name: "Donald", Favorite: Book{Title: "Immortality"}}
 		actual, err := shredder.Shred(Document{Assertions: []any{me}})
 		assert.NoError(t, err)
@@ -162,7 +163,7 @@ func TestMapFields(t *testing.T) {
 	}
 
 	t.Run("assert", func(t *testing.T) {
-		shredder := NewShredder()
+		shredder := NewShredder(models.BuildCachingAnalyzer())
 		me := Person{Name: "Donald", FavoriteBooks: map[string]Book{
 			"Immortality":          {Title: "Immortality", Author: "Milan Kundera"},
 			"Parable of the Sower": {Title: "Parable of the Sower", Author: "Octavia Butler"},
@@ -212,7 +213,7 @@ func TestScalarSliceFields(t *testing.T) {
 	}
 
 	t.Run("assert", func(t *testing.T) {
-		shredder := NewShredder()
+		shredder := NewShredder(models.BuildCachingAnalyzer())
 		test := Test{
 			Title: "Algebra II",
 			// we're pretending order is important here, e.g. tests repeatedly taken over time
@@ -256,7 +257,7 @@ func TestStructSliceFields(t *testing.T) {
 	}
 
 	t.Run("assert", func(t *testing.T) {
-		shredder := NewShredder()
+		shredder := NewShredder(models.BuildCachingAnalyzer())
 		test := Test{
 			Title: "Algebra II",
 			Runs: []Run{

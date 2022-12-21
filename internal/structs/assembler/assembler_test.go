@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dball/destructive/internal/structs/models"
 	. "github.com/dball/destructive/internal/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,7 +26,7 @@ func TestSimple(t *testing.T) {
 	var p *Person
 
 	t.Run("no facts", func(t *testing.T) {
-		assembler, err := NewAssembler(p, []Fact{})
+		assembler, err := NewAssembler(models.BuildCachingAnalyzer(), p, []Fact{})
 		assert.NoError(t, err)
 		actual, err := assembler.Next()
 		assert.NoError(t, err)
@@ -47,7 +48,7 @@ func TestSimple(t *testing.T) {
 			{E: ID(1), A: Ident("person/born"), V: Inst(born)},
 			{E: ID(1), A: Ident("person/died"), V: Inst(died)},
 		}
-		assembler, err := NewAssembler(p, facts)
+		assembler, err := NewAssembler(models.BuildCachingAnalyzer(), p, facts)
 		assert.NoError(t, err)
 		actual, err := assembler.Next()
 		assert.NoError(t, err)
@@ -99,7 +100,7 @@ func TestStructs(t *testing.T) {
 			{E: ID(2), A: Ident("book/title"), V: String("Immortality")},
 			{E: ID(3), A: Ident("book/title"), V: String("The Parable of the Sower")},
 		}
-		assembler, err := NewAssembler(p, facts)
+		assembler, err := NewAssembler(models.BuildCachingAnalyzer(), p, facts)
 		assert.NoError(t, err)
 		actual, err := assembler.Next()
 		assert.NoError(t, err)
@@ -121,7 +122,7 @@ func TestStructCycles(t *testing.T) {
 		{E: ID(2), A: Ident("person/name"), V: String("Pabu")},
 		{E: ID(2), A: Ident("person/bff"), V: ID(1)},
 	}
-	assembler, err := NewAssembler(p, facts)
+	assembler, err := NewAssembler(models.BuildCachingAnalyzer(), p, facts)
 	assert.NoError(t, err)
 	actual, err := assembler.Next()
 	assert.NoError(t, err)
@@ -159,7 +160,7 @@ func TestMapWithStructValues(t *testing.T) {
 		{E: ID(3), A: Ident("book/genre"), V: String("specfic")},
 		{E: ID(3), A: Ident("book/title"), V: String("The Actual Star")},
 	}
-	assembler, err := NewAssembler(p, facts)
+	assembler, err := NewAssembler(models.BuildCachingAnalyzer(), p, facts)
 	assert.NoError(t, err)
 	actual, err := assembler.Next()
 	assert.NoError(t, err)
@@ -190,7 +191,7 @@ func TestMapWithPointerValues(t *testing.T) {
 		{E: ID(3), A: Ident("book/genre"), V: String("specfic")},
 		{E: ID(3), A: Ident("book/title"), V: String("The Actual Star")},
 	}
-	assembler, err := NewAssembler(p, facts)
+	assembler, err := NewAssembler(models.BuildCachingAnalyzer(), p, facts)
 	assert.NoError(t, err)
 	actual, err := assembler.Next()
 	assert.NoError(t, err)
@@ -227,7 +228,7 @@ func TestSliceOfStructValues(t *testing.T) {
 		{E: ID(3), A: Ident("book/title"), V: String("The Actual Star")},
 		{E: ID(3), A: Ident("sys/db/rank"), V: Int(0)},
 	}
-	assembler, err := NewAssembler(p, facts)
+	assembler, err := NewAssembler(models.BuildCachingAnalyzer(), p, facts)
 	assert.NoError(t, err)
 	actual, err := assembler.Next()
 	assert.NoError(t, err)
@@ -261,7 +262,7 @@ func TestSliceOfScalarValues(t *testing.T) {
 		{E: ID(4), A: Ident("sys/db/rank"), V: Int(2)},
 		{E: ID(4), A: Ident("test/score"), V: Float(98.9)},
 	}
-	assembler, err := NewAssembler(x, facts)
+	assembler, err := NewAssembler(models.BuildCachingAnalyzer(), x, facts)
 	assert.NoError(t, err)
 	actual, err := assembler.Next()
 	assert.NoError(t, err)
