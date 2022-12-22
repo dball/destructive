@@ -2,6 +2,7 @@ package database
 
 import (
 	"testing"
+	"time"
 
 	"github.com/dball/destructive/internal/sys"
 	. "github.com/dball/destructive/internal/types"
@@ -203,5 +204,27 @@ func TestBool(t *testing.T) {
 	data := view.Select(Claim{E: id, A: Ident("person/likes-pickles")}).Drain()
 	assert.Equal(t, []Datum{
 		{E: id, A: view.ResolveIdent(Ident("person/likes-pickles")), V: Bool(true), T: tx},
+	}, data)
+}
+
+func TestInst(t *testing.T) {
+	db := NewIndexDatabase(32, 64, 64)
+	assert.NoError(t, Declare(db,
+		Attr{Ident: "person/born", Type: sys.AttrTypeInst},
+	))
+	born := time.Date(1969, 7, 20, 20, 17, 54, 0, time.UTC)
+	req := Request{
+		Claims: []Claim{
+			{E: TempID("1"), A: Ident("person/born"), V: Inst(born)},
+		},
+	}
+	res := db.Write(req)
+	assert.NoError(t, res.Error)
+	id := res.TempIDs[TempID("1")]
+	view := res.Snapshot
+	tx := res.ID
+	data := view.Select(Claim{E: id, A: Ident("person/born")}).Drain()
+	assert.Equal(t, []Datum{
+		{E: id, A: view.ResolveIdent(Ident("person/born")), V: Inst(born), T: tx},
 	}, data)
 }
