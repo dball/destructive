@@ -224,7 +224,30 @@ func TestInst(t *testing.T) {
 	view := res.Snapshot
 	tx := res.ID
 	data := view.Select(Claim{E: id, A: Ident("person/born")}).Drain()
+
 	assert.Equal(t, []Datum{
 		{E: id, A: view.ResolveIdent(Ident("person/born")), V: Inst(born), T: tx},
+	}, data)
+}
+
+func TestInt(t *testing.T) {
+	db := NewIndexDatabase(32, 64, 64)
+	assert.NoError(t, Declare(db,
+		Attr{Ident: "person/age", Type: sys.AttrTypeInt},
+	))
+	req := Request{
+		Claims: []Claim{
+			{E: TempID("1"), A: Ident("person/age"), V: Int(49)},
+		},
+	}
+	res := db.Write(req)
+	assert.NoError(t, res.Error)
+	id := res.TempIDs[TempID("1")]
+	view := res.Snapshot
+	tx := res.ID
+	data := view.Select(Claim{E: id, A: Ident("person/age")}).Drain()
+
+	assert.Equal(t, []Datum{
+		{E: id, A: view.ResolveIdent(Ident("person/age")), V: Int(49), T: tx},
 	}, data)
 }
