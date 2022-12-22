@@ -155,7 +155,7 @@ func (db *indexDatabase) Write(req Request) (res Response) {
 				datum := iter.Value()
 				// We could go straight to the indexes with the datums instead of allocating them anew as claims
 				// but we will need to handle invariant enforcement and cache maintenance differently.
-				claims = append(claims, &Claim{E: datum.E, A: datum.A, V: datum.V.(VRef), Retract: true})
+				claims = append(claims, Claim{E: datum.E, A: datum.A, V: datum.V.(VRef), Retract: true})
 			}
 		}
 	}
@@ -165,7 +165,7 @@ func (db *indexDatabase) Write(req Request) (res Response) {
 	data := make([]*Datum, 0, len(claims))
 CLAIMS:
 	for _, claim := range claims {
-		datum := db.evaluateClaim(&res, claim)
+		datum := db.evaluateClaim(&res, &claim)
 		if res.Error != nil {
 			break
 		}

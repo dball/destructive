@@ -29,12 +29,14 @@ func TestSimple(t *testing.T) {
 	t.Run("simple entity", func(t *testing.T) {
 		db := database.NewIndexDatabase(32, 64, 64)
 		analyzer := models.BuildCachingAnalyzer()
+		//claims, err := schemas.Analyze(reflect.TypeOf((*Person)(nil)))
+		//db.Write(Request{Claims: claims})
 		database.Declare(db,
 			Attr{Ident: "person/name", Type: sys.AttrTypeString},
 			Attr{Ident: "person/title", Type: sys.AttrTypeString},
 		)
 		req := Request{
-			Claims: []*Claim{
+			Claims: []Claim{
 				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 				{E: TempID("1"), A: Ident("person/title"), V: String("Citizen")},
 			},

@@ -92,9 +92,9 @@ type Retraction struct {
 // Request is a set of claims and constraints on their temporary ids.
 type Request struct {
 	// The list of claims.
-	Claims []*Claim
+	Claims []Claim
 	// The list of retractions.
-	Retractions []*Retraction
+	Retractions []Retraction
 }
 
 // Response is the result of trying to apply a request to the database.

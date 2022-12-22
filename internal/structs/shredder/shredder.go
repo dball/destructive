@@ -53,30 +53,31 @@ func (s *shredder) Shred(doc Document) (req Request, err error) {
 		pointers: make(map[reflect.Value]TempID, len(doc.Assertions)),
 	}
 	// The likely size here is actually assertions*numFields
-	req.Claims = make([]*Claim, 0, len(doc.Assertions))
-	req.Retractions = make([]*Retraction, 0, len(doc.Retractions))
+	req.Claims = make([]Claim, 0, len(doc.Assertions))
+	req.Retractions = make([]Retraction, 0, len(doc.Retractions))
 	for _, x := range doc.Retractions {
 		var retraction *Retraction
 		retraction, err = s.retract(&confetti, x)
 		if err != nil {
 			return
 		}
-		req.Retractions = append(req.Retractions, retraction)
+		req.Retractions = append(req.Retractions, *retraction)
 	}
 	for _, x := range doc.Assertions {
-		var claims []*Claim
+		var claims []Claim
 		_, claims, err = s.assert(&confetti, x)
 		if err != nil {
 			return
 		}
 		req.Claims = append(req.Claims, claims...)
 	}
-	for _, claim := range req.Claims {
+	for i, claim := range req.Claims {
 		e, ok := claim.E.(TempID)
 		if ok {
 			id := confetti.tempIDs[e]
 			if id != 0 {
 				claim.E = id
+				req.Claims[i] = claim
 			}
 		}
 		v, ok := claim.V.(TempID)
@@ -84,13 +85,14 @@ func (s *shredder) Shred(doc Document) (req Request, err error) {
 			id := confetti.tempIDs[v]
 			if id != 0 {
 				claim.V = id
+				req.Claims[i] = claim
 			}
 		}
 	}
 	return
 }
 
-func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim, err error) {
+func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []Claim, err error) {
 	typ := reflect.TypeOf(x)
 	var fields reflect.Value
 	var id ID
@@ -121,8 +123,8 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim,
 		err = modelErr
 		return
 	}
-	claims = make([]*Claim, 0, len(model.AttrFields))
-	var refFieldsClaims []*Claim
+	claims = make([]Claim, 0, len(model.AttrFields))
+	var refFieldsClaims []Claim
 	for _, attr := range model.AttrFields {
 		fieldValue := fields.Field(attr.Index)
 		if attr.Ident == sys.DbId {
@@ -163,7 +165,7 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim,
 			// TODO idk if tempid constraints are legit or not
 		case values:
 			for i, vv := range v {
-				var refFieldClaims []*Claim
+				var refFieldClaims []Claim
 				if attr.CollValue != "" {
 					vvv, ok := ToVRef(vv)
 					if !ok {
@@ -172,10 +174,10 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim,
 					}
 					ve := s.nextTempID()
 					refFieldsClaims = append(refFieldsClaims,
-						&Claim{E: ve, A: Ident("sys/db/rank"), V: Int(i)},
-						&Claim{E: ve, A: attr.CollValue, V: vvv},
+						Claim{E: ve, A: Ident("sys/db/rank"), V: Int(i)},
+						Claim{E: ve, A: attr.CollValue, V: vvv},
 					)
-					claims = append(claims, &Claim{E: e, A: attr.Ident, V: ve})
+					claims = append(claims, Claim{E: e, A: attr.Ident, V: ve})
 				} else {
 					vref, refFieldClaims, err = s.assert(confetti, vv)
 					if err != nil {
@@ -185,25 +187,25 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []*Claim,
 					case attr.MapKey != "":
 						refFieldsClaims = append(refFieldsClaims, refFieldClaims...)
 					case len(refFieldClaims) > 0:
-						refFieldsClaims = append(refFieldsClaims, &Claim{E: refFieldClaims[0].E, A: Ident("sys/db/rank"), V: Int(i)})
+						refFieldsClaims = append(refFieldsClaims, Claim{E: refFieldClaims[0].E, A: Ident("sys/db/rank"), V: Int(i)})
 						refFieldsClaims = append(refFieldsClaims, refFieldClaims...)
 					default:
 						err = NewError("shredder.missingSliceCollectionValue")
 						return
 					}
-					claims = append(claims, &Claim{E: e, A: attr.Ident, V: vref})
+					claims = append(claims, Claim{E: e, A: attr.Ident, V: vref})
 				}
 			}
 			continue
 		default:
-			var refFieldClaims []*Claim
+			var refFieldClaims []Claim
 			vref, refFieldClaims, err = s.assert(confetti, v)
 			if err != nil {
 				return
 			}
 			refFieldsClaims = append(refFieldsClaims, refFieldClaims...)
 		}
-		claims = append(claims, &Claim{E: e, A: attr.Ident, V: vref})
+		claims = append(claims, Claim{E: e, A: attr.Ident, V: vref})
 	}
 	claims = append(claims, refFieldsClaims...)
 	return

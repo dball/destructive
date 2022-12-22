@@ -12,7 +12,7 @@ func TestWriteSimple(t *testing.T) {
 	db := NewIndexDatabase(32, 64, 64)
 	var e, tx ID
 	req := Request{
-		Claims: []*Claim{
+		Claims: []Claim{
 			{E: TempID("1"), A: sys.DbIdent, V: String("test/ident")},
 		},
 	}
@@ -51,7 +51,7 @@ func TestWriteAttr(t *testing.T) {
 	))
 
 	req := Request{
-		Claims: []*Claim{
+		Claims: []Claim{
 			{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 		},
 	}
@@ -72,7 +72,7 @@ func TestEnforceValueUnique(t *testing.T) {
 	))
 
 	req := Request{
-		Claims: []*Claim{
+		Claims: []Claim{
 			{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 			{E: TempID("1"), A: Ident("person/age"), V: Int(49)},
 			{E: TempID("1"), A: Ident("person/score"), V: Float(23.42)},
@@ -84,7 +84,7 @@ func TestEnforceValueUnique(t *testing.T) {
 	assert.Positive(t, id)
 
 	req = Request{
-		Claims: []*Claim{
+		Claims: []Claim{
 			{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 			{E: TempID("1"), A: Ident("person/age"), V: Int(50)},
 		},
@@ -101,7 +101,7 @@ func TestIdentityUnique(t *testing.T) {
 		Attr{Ident: "person/score", Type: sys.AttrTypeFloat},
 	))
 	req := Request{
-		Claims: []*Claim{
+		Claims: []Claim{
 			{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 			{E: TempID("1"), A: Ident("person/age"), V: Int(49)},
 			{E: TempID("1"), A: Ident("person/score"), V: Float(23.42)},
@@ -115,7 +115,7 @@ func TestIdentityUnique(t *testing.T) {
 	assert.True(t, ok)
 
 	req = Request{
-		Claims: []*Claim{
+		Claims: []Claim{
 			{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 			{E: TempID("1"), A: Ident("person/age"), V: Int(50)},
 		},
@@ -139,7 +139,7 @@ func TestSelect(t *testing.T) {
 		Attr{Ident: "person/score", Type: sys.AttrTypeFloat},
 	))
 	req := Request{
-		Claims: []*Claim{
+		Claims: []Claim{
 			{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 			{E: TempID("1"), A: Ident("person/age"), V: Int(49)},
 			{E: TempID("1"), A: Ident("person/score"), V: Float(23.42)},
@@ -166,7 +166,7 @@ func TestRetract(t *testing.T) {
 		Attr{Ident: "person/score", Type: sys.AttrTypeFloat},
 	))
 	req := Request{
-		Claims: []*Claim{
+		Claims: []Claim{
 			{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 			{E: TempID("1"), A: Ident("person/age"), V: Int(49)},
 			{E: TempID("1"), A: Ident("person/score"), V: Float(23.42)},
@@ -175,7 +175,7 @@ func TestRetract(t *testing.T) {
 	res := db.Write(req)
 	assert.NoError(t, res.Error)
 	req = Request{
-		Retractions: []*Retraction{
+		Retractions: []Retraction{
 			{Constraints: map[IDRef]Void{LookupRef{A: Ident("person/name"), V: String("Donald")}: {}}},
 		},
 	}

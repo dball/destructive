@@ -16,22 +16,22 @@ func Declare(db Database, attrs ...Attr) (err error) {
 	return
 }
 
-func attrClaims(attrs []Attr) (claims []*Claim) {
-	claims = make([]*Claim, 0, len(attrs)*4)
+func attrClaims(attrs []Attr) (claims []Claim) {
+	claims = make([]Claim, 0, len(attrs)*4)
 	for i, attr := range attrs {
 		e := TempID(strconv.Itoa(i))
 		claims = append(claims,
-			&Claim{E: e, A: sys.DbIdent, V: String(attr.Ident)},
-			&Claim{E: e, A: sys.AttrType, V: attr.Type},
+			Claim{E: e, A: sys.DbIdent, V: String(attr.Ident)},
+			Claim{E: e, A: sys.AttrType, V: attr.Type},
 		)
 		if attr.Unique != 0 {
 			claims = append(claims,
-				&Claim{E: e, A: sys.AttrUnique, V: attr.Unique},
+				Claim{E: e, A: sys.AttrUnique, V: attr.Unique},
 			)
 		}
 		if attr.Cardinality != 0 {
 			claims = append(claims,
-				&Claim{E: e, A: sys.AttrCardinality, V: attr.Cardinality},
+				Claim{E: e, A: sys.AttrCardinality, V: attr.Cardinality},
 			)
 		}
 	}

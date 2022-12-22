@@ -28,12 +28,12 @@ func TestShred(t *testing.T) {
 		req, err := shredder.Shred(Document{Assertions: []any{p}})
 		assert.NoError(t, err)
 		expected := Request{
-			Claims: []*Claim{
+			Claims: []Claim{
 				{E: ID(23), A: Ident("person/name"), V: String("Donald")},
 				{E: ID(23), A: Ident("person/age"), V: Int(48)},
 				{E: ID(23), A: Ident("person/birthdate"), V: Inst(epoch)},
 			},
-			Retractions: []*Retraction{},
+			Retractions: []Retraction{},
 		}
 		assert.Equal(t, expected, req)
 	})
@@ -44,8 +44,8 @@ func TestShred(t *testing.T) {
 		req, err := shredder.Shred(Document{Retractions: []any{p}})
 		assert.NoError(t, err)
 		expected := Request{
-			Claims: []*Claim{},
-			Retractions: []*Retraction{
+			Claims: []Claim{},
+			Retractions: []Retraction{
 				{
 					Constraints: map[IDRef]Void{
 						ID(23): {},
@@ -63,11 +63,11 @@ func TestShred(t *testing.T) {
 		req, err := shredder.Shred(Document{Assertions: []any{p}})
 		assert.NoError(t, err)
 		expected := Request{
-			Claims: []*Claim{
+			Claims: []Claim{
 				{E: ID(23), A: Ident("person/name"), V: String("Donald")},
 				{E: ID(23), A: Ident("person/uuid"), V: String("the-uuid")},
 			},
-			Retractions: []*Retraction{},
+			Retractions: []Retraction{},
 		}
 		assert.Equal(t, expected, req)
 	})
@@ -80,12 +80,12 @@ func TestShred(t *testing.T) {
 		req, err := shredder.Shred(Document{Assertions: []any{p}})
 		assert.NoError(t, err)
 		expected := Request{
-			Claims: []*Claim{
+			Claims: []Claim{
 				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 				{E: TempID("1"), A: Ident("person/pets"), V: Int(4)},
 				{E: TempID("1"), A: Ident("person/deathdate"), V: Inst(epoch)},
 			},
-			Retractions: []*Retraction{},
+			Retractions: []Retraction{},
 		}
 		assert.Equal(t, expected, req)
 	})
@@ -112,13 +112,13 @@ func TestRefs(t *testing.T) {
 		actual, err := shredder.Shred(Document{Assertions: []any{&momo, &pabu}})
 		assert.NoError(t, err)
 		expected := Request{
-			Claims: []*Claim{
+			Claims: []Claim{
 				{E: TempID("1"), A: Ident("person/name"), V: String("Momo")},
 				{E: TempID("1"), A: Ident("person/bff"), V: TempID("2")},
 				{E: TempID("2"), A: Ident("person/name"), V: String("Pabu")},
 				{E: TempID("2"), A: Ident("person/bff"), V: TempID("1")},
 			},
-			Retractions: []*Retraction{},
+			Retractions: []Retraction{},
 		}
 		assert.Equal(t, expected, actual)
 	})
@@ -140,12 +140,12 @@ func TestStructs(t *testing.T) {
 		actual, err := shredder.Shred(Document{Assertions: []any{me}})
 		assert.NoError(t, err)
 		expected := Request{
-			Claims: []*Claim{
+			Claims: []Claim{
 				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 				{E: TempID("1"), A: Ident("person/favorite-book"), V: TempID("2")},
 				{E: TempID("2"), A: Ident("book/title"), V: String("Immortality")},
 			},
-			Retractions: []*Retraction{},
+			Retractions: []Retraction{},
 		}
 		assert.Equal(t, expected, actual)
 	})
@@ -172,7 +172,7 @@ func TestMapFields(t *testing.T) {
 		assert.NoError(t, err)
 		// The order of map entries is not specified, so we must allow both permutations.
 		expected1 := Request{
-			Claims: []*Claim{
+			Claims: []Claim{
 				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 				{E: TempID("1"), A: Ident("person/favorite-books"), V: TempID("2")},
 				{E: TempID("1"), A: Ident("person/favorite-books"), V: TempID("3")},
@@ -181,10 +181,10 @@ func TestMapFields(t *testing.T) {
 				{E: TempID("3"), A: Ident("book/title"), V: String("Parable of the Sower")},
 				{E: TempID("3"), A: Ident("book/author"), V: String("Octavia Butler")},
 			},
-			Retractions: []*Retraction{},
+			Retractions: []Retraction{},
 		}
 		expected2 := Request{
-			Claims: []*Claim{
+			Claims: []Claim{
 				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 				{E: TempID("1"), A: Ident("person/favorite-books"), V: TempID("2")},
 				{E: TempID("1"), A: Ident("person/favorite-books"), V: TempID("3")},
@@ -193,7 +193,7 @@ func TestMapFields(t *testing.T) {
 				{E: TempID("3"), A: Ident("book/title"), V: String("Immortality")},
 				{E: TempID("3"), A: Ident("book/author"), V: String("Milan Kundera")},
 			},
-			Retractions: []*Retraction{},
+			Retractions: []Retraction{},
 		}
 		switch {
 		case assert.ObjectsAreEqual(expected1, actual):
@@ -225,7 +225,7 @@ func TestScalarSliceFields(t *testing.T) {
 		// Either that, or a txn fn that compares ordered list values and computes the minimal
 		// set of datum changes to transform one into the other.
 		expected := Request{
-			Claims: []*Claim{
+			Claims: []Claim{
 				{E: TempID("1"), A: Ident("test/title"), V: String("Algebra II")},
 				{E: TempID("1"), A: Ident("test/scores"), V: TempID("2")},
 				{E: TempID("1"), A: Ident("test/scores"), V: TempID("3")},
@@ -237,7 +237,7 @@ func TestScalarSliceFields(t *testing.T) {
 				{E: TempID("4"), A: Ident("sys/db/rank"), V: Int(2)},
 				{E: TempID("4"), A: Ident("test/score"), V: Float(98.9)},
 			},
-			Retractions: []*Retraction{},
+			Retractions: []Retraction{},
 		}
 		assert.Equal(t, expected, actual)
 	})
@@ -272,7 +272,7 @@ func TestStructSliceFields(t *testing.T) {
 		// Either that, or a txn fn that compares ordered list values and computes the minimal
 		// set of datum changes to transform one into the other.
 		expected := Request{
-			Claims: []*Claim{
+			Claims: []Claim{
 				{E: TempID("1"), A: Ident("test/title"), V: String("Algebra II")},
 				{E: TempID("1"), A: Ident("test/scores"), V: TempID("2")},
 				{E: TempID("1"), A: Ident("test/scores"), V: TempID("3")},
@@ -284,7 +284,7 @@ func TestStructSliceFields(t *testing.T) {
 				{E: TempID("4"), A: Ident("sys/db/rank"), V: Int(2)},
 				{E: TempID("4"), A: Ident("test/score"), V: Float(98.9)},
 			},
-			Retractions: []*Retraction{},
+			Retractions: []Retraction{},
 		}
 		assert.Equal(t, expected, actual)
 	})
