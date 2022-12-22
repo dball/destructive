@@ -2,6 +2,7 @@
 package index
 
 import (
+	"math"
 	"time"
 
 	"github.com/dball/destructive/internal/iterator"
@@ -142,7 +143,7 @@ var boolValuer TypeValuer[uint64] = TypeValuer[uint64]{
 	},
 }
 var instValuer TypeValuer[int64] = TypeValuer[int64]{
-	valuer:   func(v int64) (value Value) { return Inst(time.UnixMilli(v)) },
+	valuer:   func(v int64) (value Value) { return Inst(time.UnixMilli(v).UTC()) },
 	devaluer: func(value Value) (v int64) { return time.Time(value.(Inst)).UnixMilli() },
 }
 
@@ -297,11 +298,11 @@ func (idx *CompositeIndex) Select(p PartialIndex, datum Datum) (iter *iterator.I
 	case sys.AttrTypeInt:
 		switch p {
 		case EA:
-			iter = idx.ints.Select(CompareEA[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A})
+			iter = idx.ints.Select(CompareEA[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
 		case AE:
-			iter = idx.ints.Select(CompareAE[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A})
+			iter = idx.ints.Select(CompareAE[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
 		case A:
-			iter = idx.ints.Select(CompareA[int64], intValuer.valuer, TypedDatum[int64]{A: datum.A})
+			iter = idx.ints.Select(CompareA[int64], intValuer.valuer, TypedDatum[int64]{A: datum.A, V: math.MinInt64})
 		case AV:
 			iter = idx.ints.Select(CompareAV[int64], intValuer.valuer, TypedDatum[int64]{A: datum.A, V: intValuer.devaluer(datum.V)})
 		}
@@ -341,11 +342,11 @@ func (idx *CompositeIndex) Select(p PartialIndex, datum Datum) (iter *iterator.I
 	case sys.AttrTypeInst:
 		switch p {
 		case EA:
-			iter = idx.ints.Select(CompareEA[int64], instValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A})
+			iter = idx.ints.Select(CompareEA[int64], instValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
 		case AE:
-			iter = idx.ints.Select(CompareAE[int64], instValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A})
+			iter = idx.ints.Select(CompareAE[int64], instValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
 		case A:
-			iter = idx.ints.Select(CompareA[int64], instValuer.valuer, TypedDatum[int64]{A: datum.A})
+			iter = idx.ints.Select(CompareA[int64], instValuer.valuer, TypedDatum[int64]{A: datum.A, V: math.MinInt64})
 		case AV:
 			iter = idx.ints.Select(CompareAV[int64], instValuer.valuer, TypedDatum[int64]{A: datum.A, V: instValuer.devaluer(datum.V)})
 		}

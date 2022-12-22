@@ -224,7 +224,6 @@ func TestInst(t *testing.T) {
 	view := res.Snapshot
 	tx := res.ID
 	data := view.Select(Claim{E: id, A: Ident("person/born")}).Drain()
-
 	assert.Equal(t, []Datum{
 		{E: id, A: view.ResolveIdent(Ident("person/born")), V: Inst(born), T: tx},
 	}, data)
