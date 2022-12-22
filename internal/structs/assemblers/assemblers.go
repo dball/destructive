@@ -8,7 +8,6 @@ import (
 	"github.com/dball/destructive/internal/structs/models"
 	"github.com/dball/destructive/internal/sys"
 	. "github.com/dball/destructive/internal/types"
-	"github.com/dball/destructive/pkg/database"
 )
 
 type mapAwaitingEntry struct {
@@ -43,9 +42,10 @@ type assembler struct {
 	slicesAwaitingEntries map[ID][]sliceAwaitingEntry
 }
 
-func NewAssembler(analyzer models.Analyzer, snapshot database.Snapshot) (a *assembler) {
+func NewAssembler(analyzer models.Analyzer, snapshot Snapshot) (a *assembler) {
 	a = &assembler{
 		analyzer:              analyzer,
+		snapshot:              snapshot,
 		instances:             map[ID]reflect.Value{},
 		pointers:              map[ID]reflect.Value{},
 		unprocessed:           map[ID]reflect.Value{},
@@ -104,18 +104,11 @@ func (a *assembler) assemble(id ID, ptr reflect.Value) (err error) {
 	// if we had reason to believe the snapshot E had many more A's.
 	iter := a.snapshot.Select(Claim{E: id})
 	foundAny := false
-	if foundAny {
-		attr, ok := model.Attr(Ident(sys.DbId))
-		if ok {
-			field := value.Field(attr.Index)
-			field.SetUint(uint64(id))
-		}
-	}
-
 	for iter.Next() {
 		foundAny = true
 		datum := iter.Value()
-		attr, ok := model.Attr(a.snapshot.ResolveAttrIdent(datum.A))
+		ident := a.snapshot.ResolveAttrIdent(datum.A)
+		attr, ok := model.Attr(ident)
 		if !ok {
 			// Here's where we could be accumulating stats of attr hit rates for e types, sort of.
 			continue
@@ -229,6 +222,13 @@ func (a *assembler) assemble(id ID, ptr reflect.Value) (err error) {
 			}
 		}
 	}
+	if foundAny {
+		attr, ok := model.Attr(Ident(sys.DbId))
+		if ok {
+			field := value.Field(attr.Index)
+			field.SetUint(uint64(id))
+		}
+	}
 	maes, ok := a.mapsAwaitingEntries[id]
 	if ok {
 		for _, mae := range maes {
@@ -331,6 +331,11 @@ func Assemble[T any](a *assembler, id ID, entityPointer *T) (entity T, err error
 		a.allocate(id, pointerType)
 		err = a.assembleAll()
 		if err != nil {
+			return
+		}
+		instance, ok = a.instances[id]
+		if !ok {
+			err = NewError("assembler.failure", "id", id)
 			return
 		}
 	}

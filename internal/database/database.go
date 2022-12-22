@@ -280,6 +280,7 @@ CLAIMS:
 			break
 		}
 		attr.Ident = ident
+		attrChanges[id] = attr
 		if !sys.ValidAttrType(attr.Type) {
 			res.Error = NewError("database.write.invalidAttrType", "attr", attr)
 			break
