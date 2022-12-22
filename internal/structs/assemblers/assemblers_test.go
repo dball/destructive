@@ -34,10 +34,20 @@ func TestSimple(t *testing.T) {
 		assert.NoError(t, err)
 		res := db.Write(Request{Claims: claims})
 		assert.NoError(t, res.Error)
+		born := time.Date(1969, 7, 20, 20, 17, 54, 0, time.UTC)
+		died := time.Date(1986, 1, 28, 16, 39, 13, 0, time.UTC)
 		req := Request{
 			Claims: []Claim{
 				{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
 				{E: TempID("1"), A: Ident("person/title"), V: String("Citizen")},
+				{E: TempID("1"), A: Ident("person/cat-count"), V: Int(4)},
+				{E: TempID("1"), A: Ident("person/dog-count"), V: Int(0)},
+				{E: TempID("1"), A: Ident("person/likes-pizza"), V: Bool(true)},
+				{E: TempID("1"), A: Ident("person/likes-pickles"), V: Bool(true)},
+				{E: TempID("1"), A: Ident("person/score"), V: Float(2.3)},
+				{E: TempID("1"), A: Ident("person/top-score"), V: Float(4.2)},
+				{E: TempID("1"), A: Ident("person/born"), V: Inst(born)},
+				{E: TempID("1"), A: Ident("person/died"), V: Inst(died)},
 			},
 		}
 		res = db.Write(req)
@@ -48,7 +58,22 @@ func TestSimple(t *testing.T) {
 		entity, err := Assemble(assembler, id, (*Person)(nil))
 		assert.NoError(t, err)
 		title := "Citizen"
-		expected := Person{ID: uint64(id), Name: "Donald", Title: &title}
+		zero := 0
+		yes := true
+		fourPointTwo := 4.2
+		expected := Person{
+			ID:           uint64(id),
+			Name:         "Donald",
+			Title:        &title,
+			CatCount:     4,
+			DogCount:     &zero,
+			LikesPizza:   true,
+			LikesPickles: &yes,
+			Score:        2.3,
+			TopScore:     &fourPointTwo,
+			Born:         born,
+			Died:         &died,
+		}
 		assert.Equal(t, expected, entity)
 	})
 }
