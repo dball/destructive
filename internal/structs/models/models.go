@@ -184,7 +184,7 @@ func parseAttrField(field reflect.StructField) (attr AttrFieldModel, err error) 
 		case reflect.Float64:
 			attr.Type = sys.AttrTypeFloat
 		case reflect.Struct:
-			if TimeType == field.Type {
+			if TimeType == field.Type.Elem() {
 				attr.Type = sys.AttrTypeInst
 			} else {
 				attr.Type = sys.AttrTypeRef
