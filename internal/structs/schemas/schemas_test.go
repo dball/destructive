@@ -3,6 +3,7 @@ package schemas
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/dball/destructive/internal/sys"
 	. "github.com/dball/destructive/internal/types"
@@ -11,9 +12,10 @@ import (
 
 func TestAnalyzeSimple(t *testing.T) {
 	type Person struct {
-		ID    uint64  `attr:"sys/db/id"`
-		Name  string  `attr:"person/name,identity"`
-		Title *string `attr:"person/title"`
+		ID    uint64     `attr:"sys/db/id"`
+		Name  string     `attr:"person/name,identity"`
+		Title *string    `attr:"person/title"`
+		Died  *time.Time `attr:"person/died"`
 	}
 	var p *Person
 
@@ -25,6 +27,8 @@ func TestAnalyzeSimple(t *testing.T) {
 		{E: TempID("1"), A: sys.AttrUnique, V: sys.AttrUniqueIdentity},
 		{E: TempID("2"), A: sys.DbIdent, V: String("person/title")},
 		{E: TempID("2"), A: sys.AttrType, V: sys.AttrTypeString},
+		{E: TempID("3"), A: sys.DbIdent, V: String("person/died")},
+		{E: TempID("3"), A: sys.AttrType, V: sys.AttrTypeInst},
 	}
 	assert.Equal(t, expected, actual)
 }

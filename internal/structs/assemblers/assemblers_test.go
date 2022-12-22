@@ -3,6 +3,7 @@ package assemblers
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/dball/destructive/internal/database"
 	"github.com/dball/destructive/internal/structs/models"
@@ -13,10 +14,9 @@ import (
 
 func TestSimple(t *testing.T) {
 	type Person struct {
-		ID    uint64  `attr:"sys/db/id"`
-		Name  string  `attr:"person/name"`
-		Title *string `attr:"person/title"`
-		/* TODO something here is failing to be claimable
+		ID           uint64     `attr:"sys/db/id"`
+		Name         string     `attr:"person/name"`
+		Title        *string    `attr:"person/title"`
 		CatCount     int        `attr:"person/cat-count"`
 		DogCount     *int       `attr:"person/dog-count"`
 		LikesPizza   bool       `attr:"person/likes-pizza"`
@@ -25,7 +25,6 @@ func TestSimple(t *testing.T) {
 		TopScore     *float64   `attr:"person/top-score"`
 		Born         time.Time  `attr:"person/born"`
 		Died         *time.Time `attr:"person/died"`
-		*/
 	}
 
 	t.Run("simple entity", func(t *testing.T) {
