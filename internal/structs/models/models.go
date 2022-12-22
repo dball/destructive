@@ -96,7 +96,7 @@ func (attr AttrFieldModel) IsPointer() bool {
 	return attr.FieldType.Kind() == reflect.Pointer
 }
 
-// Analyze builds a struct model for the given type.
+// Analyze builds a struct model for the given struct type.
 func Analyze(typ reflect.Type) (model StructModel, err error) {
 	if typ.Kind() != reflect.Struct {
 		err = NewError("models.notStruct", "type", typ)

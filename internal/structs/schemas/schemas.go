@@ -10,6 +10,8 @@ import (
 	. "github.com/dball/destructive/internal/types"
 )
 
+// Analyze builds the attribute claims necessary to record datums
+// about the given struct type.
 func Analyze(typ reflect.Type) (claims []Claim, err error) {
 	done := map[reflect.Type]Void{typ: {}}
 	todo := map[reflect.Type]Void{typ: {}}
