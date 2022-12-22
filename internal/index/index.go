@@ -125,18 +125,18 @@ var floatValuer TypeValuer[float64] = TypeValuer[float64]{
 var boolValuer TypeValuer[uint64] = TypeValuer[uint64]{
 	valuer: func(v uint64) (value Value) {
 		switch v {
-		case 0:
-			value = Bool(true)
-		case 1:
+		case uint64(0):
 			value = Bool(false)
+		case uint64(1):
+			value = Bool(true)
 		}
 		return
 	},
 	devaluer: func(value Value) (v uint64) {
 		if bool(value.(Bool)) {
-			v = 1
+			v = uint64(1)
 		} else {
-			v = 0
+			v = uint64(0)
 		}
 		return
 	},
@@ -180,9 +180,9 @@ func (idx *CompositeIndex) Insert(datum Datum) (extant bool) {
 		extant = idx.floats.Insert(TypedDatum[float64]{E: datum.E, A: datum.A, V: float64(datum.V.(Float)), T: datum.T})
 	case sys.AttrTypeBool:
 		if bool(datum.V.(Bool)) {
-			extant = idx.uints.Insert(TypedDatum[uint64]{E: datum.E, A: datum.A, V: 1, T: datum.T})
+			extant = idx.uints.Insert(TypedDatum[uint64]{E: datum.E, A: datum.A, V: uint64(1), T: datum.T})
 		} else {
-			extant = idx.uints.Insert(TypedDatum[uint64]{E: datum.E, A: datum.A, V: 0, T: datum.T})
+			extant = idx.uints.Insert(TypedDatum[uint64]{E: datum.E, A: datum.A, V: uint64(0), T: datum.T})
 		}
 	case sys.AttrTypeInst:
 		extant = idx.ints.Insert(TypedDatum[int64]{E: datum.E, A: datum.A, V: time.Time(datum.V.(Inst)).UnixMilli(), T: datum.T})

@@ -184,3 +184,24 @@ func TestRetract(t *testing.T) {
 	_, ok := res.Snapshot.Find(Claim{E: LookupRef{A: Ident("person/name"), V: String("Donald")}, A: Ident("person/age"), V: Int(49)})
 	assert.False(t, ok)
 }
+
+func TestBool(t *testing.T) {
+	db := NewIndexDatabase(32, 64, 64)
+	assert.NoError(t, Declare(db,
+		Attr{Ident: "person/likes-pickles", Type: sys.AttrTypeBool},
+	))
+	req := Request{
+		Claims: []Claim{
+			{E: TempID("1"), A: Ident("person/likes-pickles"), V: Bool(true)},
+		},
+	}
+	res := db.Write(req)
+	assert.NoError(t, res.Error)
+	id := res.TempIDs[TempID("1")]
+	view := res.Snapshot
+	tx := res.ID
+	data := view.Select(Claim{E: id, A: Ident("person/likes-pickles")}).Drain()
+	assert.Equal(t, []Datum{
+		{E: id, A: view.ResolveIdent(Ident("person/likes-pickles")), V: Bool(true), T: tx},
+	}, data)
+}
