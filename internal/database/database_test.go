@@ -237,7 +237,7 @@ func TestInt(t *testing.T) {
 	))
 	req := Request{
 		Claims: []Claim{
-			{E: TempID("1"), A: Ident("person/age"), V: Int(49)},
+			{E: TempID("1"), A: Ident("person/age"), V: Int(-49)},
 		},
 	}
 	res := db.Write(req)
@@ -248,6 +248,6 @@ func TestInt(t *testing.T) {
 	data := view.Select(Claim{E: id, A: Ident("person/age")}).Drain()
 
 	assert.Equal(t, []Datum{
-		{E: id, A: view.ResolveIdent(Ident("person/age")), V: Int(49), T: tx},
+		{E: id, A: view.ResolveIdent(Ident("person/age")), V: Int(-49), T: tx},
 	}, data)
 }
