@@ -4,7 +4,6 @@ import (
 	"reflect"
 
 	"github.com/dball/destructive/internal/database"
-	"github.com/dball/destructive/internal/structs/assembler"
 	"github.com/dball/destructive/internal/structs/models"
 	"github.com/dball/destructive/internal/structs/shredder"
 	"github.com/dball/destructive/internal/types"
@@ -103,19 +102,6 @@ func (snap *localSnapshot) Find(entity any) (found bool) {
 	if id == 0 {
 		return
 	}
-	datums := snap.snap.Select(types.Claim{E: id}).Drain()
-	facts := make([]assembler.Fact, 0, len(datums))
-	for _, datum := range datums {
-		facts = append(facts, assembler.Fact{E: datum.E, A: snap.snap.ResolveAttrIdent(datum.A), V: datum.V})
-	}
-	ass, err := assembler.NewAssembler(models.BuildCachingAnalyzer(), entity.(*any), facts)
-	if err != nil {
-		return
-	}
-	_, err = ass.Next()
-	if err != nil {
-		return
-	}
 	found = true
-	return
+	panic("TODO Use assemblers")
 }
