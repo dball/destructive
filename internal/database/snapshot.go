@@ -73,6 +73,55 @@ func (snapshot *indexSnapshot) Find(claim Claim) (match Datum, found bool) {
 	return
 }
 
+func (snapshot *indexSnapshot) Count(claim Claim) (count int) {
+	// TODO the has tree is copied from Select. Is there an efficient way to dry this up?
+	match := snapshot.resolveClaim(claim)
+	hasE := match.E != 0
+	hasA := match.A != 0
+	hasV := match.V != nil
+	switch hasE {
+	case true:
+		switch hasA {
+		case true:
+			switch hasV {
+			case true:
+				found := snapshot.eav.Find(match)
+				if found {
+					count = 1
+				}
+			case false:
+				count = snapshot.eav.Count(index.EA, match)
+			}
+		case false:
+			switch hasV {
+			case true:
+				panic("TODO ev? wtd even maybe select all and filter but should we say it's not indexed?")
+			case false:
+				count = snapshot.eav.Count(index.E, match)
+			}
+		}
+	case false:
+		switch hasA {
+		case true:
+			switch hasV {
+			case true:
+				// TODO validate A is indexed
+				count = snapshot.ave.Count(index.AV, match)
+			case false:
+				count = snapshot.aev.Count(index.A, match)
+			}
+		case false:
+			switch hasV {
+			case true:
+				panic("TODO v?? vae is only for back refs anyhow")
+			case false:
+				panic("TODO maybe just all datums from eav?")
+			}
+		}
+	}
+	return
+}
+
 func (snapshot *indexSnapshot) ResolveIdent(ident Ident) (id ID) {
 	id = snapshot.idents[ident]
 	return

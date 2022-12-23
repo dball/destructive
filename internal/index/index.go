@@ -77,6 +77,8 @@ type Index interface {
 	Select(p PartialIndex, datum Datum) (iter *iterator.Iterator[Datum])
 	// First returns the first datum matching the partial index, if any.
 	First(p PartialIndex, datum Datum) (match Datum, extant bool)
+	// Count returns the number of datums matching the partial index.
+	Count(p PartialIndex, datum Datum) (count int)
 	// Clone returns a copy of the index. Both instances are hereafter safe to change without affecting
 	// the other.
 	Clone() (clone Index)
@@ -444,6 +446,88 @@ func (idx *CompositeIndex) First(p PartialIndex, datum Datum) (match Datum, exta
 	}
 	return
 }
+
+func (idx *CompositeIndex) Count(p PartialIndex, datum Datum) (count int) {
+	// TODO should idx ensure p is legit for its type? This would just be a cross check against the
+	// database misusing its indexes.
+	if p == E {
+		count += idx.strings.Count(CompareE[string], TypedDatum[string]{E: datum.E})
+		count += idx.ints.Count(CompareE[int64], TypedDatum[int64]{E: datum.E})
+		count += idx.uints.Count(CompareE[uint64], TypedDatum[uint64]{E: datum.E})
+		count += idx.floats.Count(CompareE[float64], TypedDatum[float64]{E: datum.E})
+		return
+	}
+	switch idx.attrTypes[datum.A] {
+	case sys.AttrTypeString:
+		switch p {
+		case EA:
+			count = idx.strings.Count(CompareEA[string], TypedDatum[string]{E: datum.E, A: datum.A})
+		case AE:
+			count = idx.strings.Count(CompareAE[string], TypedDatum[string]{E: datum.E, A: datum.A})
+		case A:
+			count = idx.strings.Count(CompareA[string], TypedDatum[string]{A: datum.A})
+		case AV:
+			count = idx.strings.Count(CompareAV[string], TypedDatum[string]{A: datum.A, V: stringValuer.devaluer(datum.V)})
+		}
+	case sys.AttrTypeInt:
+		switch p {
+		case EA:
+			count = idx.ints.Count(CompareEA[int64], TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
+		case AE:
+			count = idx.ints.Count(CompareAE[int64], TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
+		case A:
+			count = idx.ints.Count(CompareA[int64], TypedDatum[int64]{A: datum.A, V: math.MinInt64})
+		case AV:
+			count = idx.ints.Count(CompareAV[int64], TypedDatum[int64]{A: datum.A, V: intValuer.devaluer(datum.V)})
+		}
+	case sys.AttrTypeRef:
+		switch p {
+		case EA:
+			count = idx.uints.Count(CompareEA[uint64], TypedDatum[uint64]{E: datum.E, A: datum.A})
+		case AE:
+			count = idx.uints.Count(CompareAE[uint64], TypedDatum[uint64]{E: datum.E, A: datum.A})
+		case A:
+			count = idx.uints.Count(CompareA[uint64], TypedDatum[uint64]{A: datum.A})
+		case AV:
+			count = idx.uints.Count(CompareAV[uint64], TypedDatum[uint64]{A: datum.A, V: refValuer.devaluer(datum.V)})
+		}
+	case sys.AttrTypeFloat:
+		switch p {
+		case EA:
+			count = idx.floats.Count(CompareEA[float64], TypedDatum[float64]{E: datum.E, A: datum.A})
+		case AE:
+			count = idx.floats.Count(CompareAE[float64], TypedDatum[float64]{E: datum.E, A: datum.A})
+		case A:
+			count = idx.floats.Count(CompareA[float64], TypedDatum[float64]{A: datum.A})
+		case AV:
+			count = idx.floats.Count(CompareAV[float64], TypedDatum[float64]{A: datum.A, V: floatValuer.devaluer(datum.V)})
+		}
+	case sys.AttrTypeBool:
+		switch p {
+		case EA:
+			count = idx.uints.Count(CompareEA[uint64], TypedDatum[uint64]{E: datum.E, A: datum.A})
+		case AE:
+			count = idx.uints.Count(CompareAE[uint64], TypedDatum[uint64]{E: datum.E, A: datum.A})
+		case A:
+			count = idx.uints.Count(CompareA[uint64], TypedDatum[uint64]{A: datum.A})
+		case AV:
+			count = idx.uints.Count(CompareAV[uint64], TypedDatum[uint64]{A: datum.A, V: boolValuer.devaluer(datum.V)})
+		}
+	case sys.AttrTypeInst:
+		switch p {
+		case EA:
+			count = idx.ints.Count(CompareEA[int64], TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
+		case AE:
+			count = idx.ints.Count(CompareAE[int64], TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
+		case A:
+			count = idx.ints.Count(CompareA[int64], TypedDatum[int64]{A: datum.A, V: math.MinInt64})
+		case AV:
+			count = idx.ints.Count(CompareAV[int64], TypedDatum[int64]{A: datum.A, V: instValuer.devaluer(datum.V)})
+		}
+	}
+	return
+}
+
 func (idx *CompositeIndex) Clone() (clone Index) {
 	clone = &CompositeIndex{
 		attrTypes: idx.attrTypes,

@@ -167,9 +167,8 @@ func (a *assembler) assemble(id ID, ptr reflect.Value) (err error) {
 				case attr.IsMap():
 					var m reflect.Value
 					if field.IsNil() {
-						// TODO ask the snapshot how many EA exist to size the map exactly.
-						// 						m = reflect.MakeMapWithSize(field.Type(), n)
-						m = reflect.MakeMap(field.Type())
+						n := a.snapshot.Count(Claim{E: datum.E, A: datum.A})
+						m = reflect.MakeMapWithSize(field.Type(), n)
 						field.Set(m)
 					} else {
 						m = field
@@ -187,10 +186,7 @@ func (a *assembler) assemble(id ID, ptr reflect.Value) (err error) {
 				case attr.IsSlice():
 					var slice reflect.Value
 					if field.IsNil() {
-						// TODO can we count this more efficiently? We don't need to copy
-						// all of these data, but we kinda need to know the exact length
-						// because we might not encounter the rank values in order.
-						n := len(a.snapshot.Select(Claim{E: datum.E, A: datum.A}).Drain())
+						n := a.snapshot.Count(Claim{E: datum.E, A: datum.A})
 						slice = reflect.MakeSlice(field.Type(), n, n)
 						field.Set(slice)
 					} else {

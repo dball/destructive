@@ -123,6 +123,8 @@ type Snapshot interface {
 	// Select returns an iterator of datums matching the claim. Empty values in the
 	// claim's fields indicate all values will match.
 	Select(claim Claim) *iterator.Iterator[Datum]
+	// Count returns the number of datums matching the claim.
+	Count(claim Claim) (count int)
 	// Find returns the datum matching the claim, if any.
 	Find(claim Claim) (match Datum, found bool)
 	// ResolveIdent resolves an ident to an id.
