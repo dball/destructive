@@ -42,8 +42,8 @@ type assembler struct {
 	slicesAwaitingEntries map[ID][]sliceAwaitingEntry
 }
 
-func NewAssembler(analyzer models.Analyzer, snapshot Snapshot) (a *assembler) {
-	a = &assembler{
+func NewAssembler(analyzer models.Analyzer, snapshot Snapshot) (as *assembler) {
+	as = &assembler{
 		analyzer:              analyzer,
 		snapshot:              snapshot,
 		instances:             map[ID]reflect.Value{},
@@ -55,7 +55,7 @@ func NewAssembler(analyzer models.Analyzer, snapshot Snapshot) (a *assembler) {
 	return
 }
 
-func (a *assembler) allocate(id ID, pointerType reflect.Type) (ptr reflect.Value) {
+func (as *assembler) allocate(id ID, pointerType reflect.Type) (ptr reflect.Value) {
 	// allocate the new pointer
 	pp := reflect.New(pointerType)
 	ptr = pp.Elem()
@@ -64,26 +64,26 @@ func (a *assembler) allocate(id ID, pointerType reflect.Type) (ptr reflect.Value
 	// store the new struct in the new pointer
 	ptr.Set(entity)
 	// store the pointer in the unrealized entities map
-	a.unprocessed[id] = ptr
-	a.pointers[id] = ptr
+	as.unprocessed[id] = ptr
+	as.pointers[id] = ptr
 	return
 }
 
-func (a *assembler) assembleAll() (err error) {
+func (as *assembler) assembleAll() (err error) {
 	for {
-		if len(a.unprocessed) == 0 {
+		if len(as.unprocessed) == 0 {
 			break
 		}
 		var id ID
 		var ptr reflect.Value
 		// TODO this should ideally be the first value in id order, so, again, sorted map
-		for k, v := range a.unprocessed {
+		for k, v := range as.unprocessed {
 			id = k
 			ptr = v
-			delete(a.unprocessed, k)
+			delete(as.unprocessed, k)
 			break
 		}
-		err = a.assemble(id, ptr)
+		err = as.assemble(id, ptr)
 		if err != nil {
 			return
 		}
@@ -91,10 +91,10 @@ func (a *assembler) assembleAll() (err error) {
 	return
 }
 
-func (a *assembler) assemble(id ID, ptr reflect.Value) (err error) {
+func (as *assembler) assemble(id ID, ptr reflect.Value) (err error) {
 	value := ptr.Elem()
 
-	model, modelErr := a.analyzer.Analyze(value.Type())
+	model, modelErr := as.analyzer.Analyze(value.Type())
 	if modelErr != nil {
 		err = modelErr
 		return
@@ -102,12 +102,12 @@ func (a *assembler) assemble(id ID, ptr reflect.Value) (err error) {
 
 	// We know the A's in which we're interested, so we could be more selective (heh) here
 	// if we had reason to believe the snapshot E had many more A's.
-	iter := a.snapshot.Select(Claim{E: id})
+	iter := as.snapshot.Select(Claim{E: id})
 	foundAny := false
 	for iter.Next() {
 		foundAny = true
 		datum := iter.Value()
-		ident := a.snapshot.ResolveAttrIdent(datum.A)
+		ident := as.snapshot.ResolveAttrIdent(datum.A)
 		attr, ok := model.Attr(ident)
 		if !ok {
 			// Here's where we could be accumulating stats of attr hit rates for e types, sort of.
@@ -136,11 +136,11 @@ func (a *assembler) assemble(id ID, ptr reflect.Value) (err error) {
 				fv := time.Time(v)
 				field.Set(reflect.ValueOf(&fv))
 			case ID:
-				pointer, ok := a.pointers[v]
+				pointer, ok := as.pointers[v]
 				if ok {
 					field.Set(pointer)
 				} else {
-					pointer := a.allocate(v, field.Type())
+					pointer := as.allocate(v, field.Type())
 					field.Set(pointer)
 				}
 			default:
@@ -167,7 +167,7 @@ func (a *assembler) assemble(id ID, ptr reflect.Value) (err error) {
 				case attr.IsMap():
 					var m reflect.Value
 					if field.IsNil() {
-						n := a.snapshot.Count(Claim{E: datum.E, A: datum.A})
+						n := as.snapshot.Count(Claim{E: datum.E, A: datum.A})
 						m = reflect.MakeMapWithSize(field.Type(), n)
 						field.Set(m)
 					} else {
@@ -178,15 +178,15 @@ func (a *assembler) assemble(id ID, ptr reflect.Value) (err error) {
 					if mapHasPointers {
 						mapValueType = mapValueType.Elem()
 					}
-					pointer, ok := a.pointers[v]
+					pointer, ok := as.pointers[v]
 					if !ok {
-						pointer = a.allocate(v, reflect.PointerTo(mapValueType))
+						pointer = as.allocate(v, reflect.PointerTo(mapValueType))
 					}
-					a.addEntityToMap(attr.MapKey, m, v, pointer, mapHasPointers, ok)
+					as.addEntityToMap(attr.MapKey, m, v, pointer, mapHasPointers, ok)
 				case attr.IsSlice():
 					var slice reflect.Value
 					if field.IsNil() {
-						n := a.snapshot.Count(Claim{E: datum.E, A: datum.A})
+						n := as.snapshot.Count(Claim{E: datum.E, A: datum.A})
 						slice = reflect.MakeSlice(field.Type(), n, n)
 						field.Set(slice)
 					} else {
@@ -194,26 +194,26 @@ func (a *assembler) assemble(id ID, ptr reflect.Value) (err error) {
 					}
 					if attr.CollValue == "" {
 						sliceValueType := slice.Type().Elem()
-						pointer, ok := a.pointers[v]
+						pointer, ok := as.pointers[v]
 						if !ok {
-							pointer = a.allocate(v, reflect.PointerTo(sliceValueType))
+							pointer = as.allocate(v, reflect.PointerTo(sliceValueType))
 						}
-						a.addEntityToSlice(attr.CollValue, slice, v, pointer, ok)
+						as.addEntityToSlice(attr.CollValue, slice, v, pointer, ok)
 					} else {
 						// Since we have exactly two facts to find, we can reasonably just go right to them,
 						// though we may want to mark the entity id as processed now.
-						scalar := a.findValue(v, attr.CollValue)
-						i := int(a.findValue(v, Ident("sys/db/rank")).(int64))
+						scalar := as.findValue(v, attr.CollValue)
+						i := int(as.findValue(v, Ident("sys/db/rank")).(int64))
 						slice.Index(i).Set(reflect.ValueOf(scalar))
 					}
 				default:
-					pointer, ok := a.pointers[v]
+					pointer, ok := as.pointers[v]
 					if ok {
 						field.Set(pointer.Elem())
 					} else {
 						pointer = field.Addr()
-						a.pointers[v] = pointer
-						a.unprocessed[v] = pointer
+						as.pointers[v] = pointer
+						as.unprocessed[v] = pointer
 					}
 				}
 			default:
@@ -229,21 +229,21 @@ func (a *assembler) assemble(id ID, ptr reflect.Value) (err error) {
 			field.SetUint(uint64(id))
 		}
 	}
-	maes, ok := a.mapsAwaitingEntries[id]
+	maes, ok := as.mapsAwaitingEntries[id]
 	if ok {
 		for _, mae := range maes {
-			a.addEntityToMap(mae.mapKey, mae.m, id, mae.pointer, mae.mapHasPointers, true)
+			as.addEntityToMap(mae.mapKey, mae.m, id, mae.pointer, mae.mapHasPointers, true)
 		}
-		delete(a.mapsAwaitingEntries, id)
+		delete(as.mapsAwaitingEntries, id)
 	}
-	saes, ok := a.slicesAwaitingEntries[id]
+	saes, ok := as.slicesAwaitingEntries[id]
 	if ok {
 		for _, sae := range saes {
-			a.addEntityToSlice(sae.collValue, sae.slice, id, sae.pointer, true)
+			as.addEntityToSlice(sae.collValue, sae.slice, id, sae.pointer, true)
 		}
-		delete(a.slicesAwaitingEntries, id)
+		delete(as.slicesAwaitingEntries, id)
 	}
-	a.instances[id] = ptr
+	as.instances[id] = ptr
 	return
 }
 
@@ -272,13 +272,13 @@ func (as *assembler) findValue(e ID, a Ident) (v any) {
 	return
 }
 
-func (a *assembler) addEntityToMap(mapKey Ident, m reflect.Value, id ID, pointer reflect.Value, mapHasPointers bool, immediate bool) {
+func (as *assembler) addEntityToMap(mapKey Ident, m reflect.Value, id ID, pointer reflect.Value, mapHasPointers bool, immediate bool) {
 	if immediate {
 		// findValue is the only way of finding the key value when it's not present on the value struct,
 		// though is plausibly much less efficient when that is the case. It might be useful to optimize
 		// that common case by constructing a more robust (cached) model of a struct's attributes that
 		// allows lookup by ident and use that to lookup the field value by index here.
-		key := a.findValue(id, mapKey)
+		key := as.findValue(id, mapKey)
 		value := pointer
 		if !mapHasPointers {
 			value = pointer.Elem()
@@ -287,53 +287,53 @@ func (a *assembler) addEntityToMap(mapKey Ident, m reflect.Value, id ID, pointer
 		return
 	}
 	mae := mapAwaitingEntry{mapKey, m, pointer, mapHasPointers}
-	maes, ok := a.mapsAwaitingEntries[id]
+	maes, ok := as.mapsAwaitingEntries[id]
 	if !ok {
-		a.mapsAwaitingEntries[id] = []mapAwaitingEntry{mae}
+		as.mapsAwaitingEntries[id] = []mapAwaitingEntry{mae}
 	} else {
 		maes = append(maes, mae)
-		a.mapsAwaitingEntries[id] = maes
+		as.mapsAwaitingEntries[id] = maes
 	}
 }
 
-func (a *assembler) addEntityToSlice(collValue Ident, slice reflect.Value, id ID, pointer reflect.Value, immediate bool) {
+func (as *assembler) addEntityToSlice(collValue Ident, slice reflect.Value, id ID, pointer reflect.Value, immediate bool) {
 	if immediate {
 		value := pointer.Elem()
-		index := a.findValue(id, Ident("sys/db/rank"))
+		index := as.findValue(id, Ident("sys/db/rank"))
 		i := int(index.(int64))
 		slice.Index(i).Set(value)
 		return
 	}
 	sae := sliceAwaitingEntry{collValue, slice, pointer}
-	saes, ok := a.slicesAwaitingEntries[id]
+	saes, ok := as.slicesAwaitingEntries[id]
 	if !ok {
-		a.slicesAwaitingEntries[id] = []sliceAwaitingEntry{sae}
+		as.slicesAwaitingEntries[id] = []sliceAwaitingEntry{sae}
 	} else {
 		saes = append(saes, sae)
-		a.slicesAwaitingEntries[id] = saes
+		as.slicesAwaitingEntries[id] = saes
 	}
 }
 
-func Assemble[T any](a *assembler, id ID, entityPointer *T) (entity T, err error) {
+func Assemble[T any](as *assembler, id ID, entityPointer *T) (entity T, err error) {
 	pointerType := reflect.TypeOf(entityPointer)
 	if pointerType.Kind() != reflect.Pointer {
 		err = NewError("assembler.destNotPointer")
 		return
 	}
 	structType := pointerType.Elem()
-	_, modelErr := a.analyzer.Analyze(structType)
+	_, modelErr := as.analyzer.Analyze(structType)
 	if modelErr != nil {
 		err = modelErr
 		return
 	}
-	instance, ok := a.instances[id]
+	instance, ok := as.instances[id]
 	if !ok {
-		a.allocate(id, pointerType)
-		err = a.assembleAll()
+		as.allocate(id, pointerType)
+		err = as.assembleAll()
 		if err != nil {
 			return
 		}
-		instance, ok = a.instances[id]
+		instance, ok = as.instances[id]
 		if !ok {
 			err = NewError("assembler.failure", "id", id)
 			return
