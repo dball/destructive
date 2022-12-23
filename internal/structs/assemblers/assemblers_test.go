@@ -153,3 +153,144 @@ func TestStructCycles(t *testing.T) {
 	assert.Equal(t, "Momo", entity.BFF.Name)
 	assert.Equal(t, "Pabu", entity.BFF.BFF.Name)
 }
+
+func TestMapWithStructValues(t *testing.T) {
+	type Book struct {
+		Title string `attr:"book/title"`
+		Genre string `attr:"book/genre"`
+	}
+	type Person struct {
+		Name string          `attr:"person/name"`
+		Favs map[string]Book `attr:"person/favs,key=book/title"`
+	}
+
+	analyzer, db := buildComponents(t, Person{})
+	req := Request{
+		Claims: []Claim{
+			{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
+			{E: TempID("1"), A: Ident("person/favs"), V: TempID("2")},
+			{E: TempID("1"), A: Ident("person/favs"), V: TempID("3")},
+			{E: TempID("2"), A: Ident("book/genre"), V: String("ya")},
+			{E: TempID("2"), A: Ident("book/title"), V: String("Legendborn")},
+			{E: TempID("3"), A: Ident("book/genre"), V: String("specfic")},
+			{E: TempID("3"), A: Ident("book/title"), V: String("The Actual Star")},
+		},
+	}
+	res := db.Write(req)
+	assert.NoError(t, res.Error)
+	assembler := NewAssembler(analyzer, res.Snapshot)
+	entity, err := Assemble(assembler, res.TempIDs[TempID("1")], (*Person)(nil))
+	assert.NoError(t, err)
+
+	assert.Equal(t, "Donald", entity.Name)
+	assert.Equal(t, 2, len(entity.Favs))
+	assert.Equal(t, Book{Title: "Legendborn", Genre: "ya"}, entity.Favs["Legendborn"])
+	assert.Equal(t, Book{Title: "The Actual Star", Genre: "specfic"}, entity.Favs["The Actual Star"])
+}
+
+func TestMapWithPointerValues(t *testing.T) {
+	type Book struct {
+		Title string `attr:"book/title"`
+		Genre string `attr:"book/genre"`
+	}
+	type Person struct {
+		Name string           `attr:"person/name"`
+		Favs map[string]*Book `attr:"person/favs,key=book/title"`
+	}
+
+	analyzer, db := buildComponents(t, Person{})
+	req := Request{
+		Claims: []Claim{
+			{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
+			{E: TempID("1"), A: Ident("person/favs"), V: TempID("2")},
+			{E: TempID("1"), A: Ident("person/favs"), V: TempID("3")},
+			{E: TempID("2"), A: Ident("book/genre"), V: String("ya")},
+			{E: TempID("2"), A: Ident("book/title"), V: String("Legendborn")},
+			{E: TempID("3"), A: Ident("book/genre"), V: String("specfic")},
+			{E: TempID("3"), A: Ident("book/title"), V: String("The Actual Star")},
+		},
+	}
+	res := db.Write(req)
+	assert.NoError(t, res.Error)
+	assembler := NewAssembler(analyzer, res.Snapshot)
+	entity, err := Assemble(assembler, res.TempIDs[TempID("1")], (*Person)(nil))
+	assert.NoError(t, err)
+
+	assert.Equal(t, "Donald", entity.Name)
+	assert.Equal(t, 2, len(entity.Favs))
+	assert.Equal(t, Book{Title: "Legendborn", Genre: "ya"}, *entity.Favs["Legendborn"])
+	assert.Equal(t, Book{Title: "The Actual Star", Genre: "specfic"}, *entity.Favs["The Actual Star"])
+}
+
+func TestSliceOfStructValues(t *testing.T) {
+	type Book struct {
+		Title string `attr:"book/title"`
+	}
+
+	type Person struct {
+		Name string `attr:"person/name"`
+		Favs []Book `attr:"person/favs"`
+	}
+
+	analyzer, db := buildComponents(t, Person{})
+	req := Request{
+		Claims: []Claim{
+			{E: TempID("1"), A: Ident("person/name"), V: String("Donald")},
+			{E: TempID("1"), A: Ident("person/favs"), V: TempID("2")},
+			{E: TempID("1"), A: Ident("person/favs"), V: TempID("3")},
+			{E: TempID("2"), A: Ident("book/title"), V: String("Legendborn")},
+			{E: TempID("2"), A: Ident("sys/db/rank"), V: Int(1)},
+			{E: TempID("3"), A: Ident("book/title"), V: String("The Actual Star")},
+			{E: TempID("3"), A: Ident("sys/db/rank"), V: Int(0)},
+		},
+	}
+	res := db.Write(req)
+	assert.NoError(t, res.Error)
+	assembler := NewAssembler(analyzer, res.Snapshot)
+	entity, err := Assemble(assembler, res.TempIDs[TempID("1")], (*Person)(nil))
+	assert.NoError(t, err)
+
+	expected := Person{
+		Name: "Donald",
+		Favs: []Book{
+			{Title: "The Actual Star"},
+			{Title: "Legendborn"},
+		},
+	}
+	assert.Equal(t, expected, entity)
+}
+
+func TestSliceOfScalarValues(t *testing.T) {
+	type Test struct {
+		Title  string    `attr:"test/title"`
+		Scores []float64 `attr:"test/scores,value=test/score"`
+	}
+
+	analyzer, db := buildComponents(t, Test{})
+	req := Request{
+		Claims: []Claim{
+			{E: TempID("1"), A: Ident("test/scores"), V: TempID("2")},
+			{E: TempID("1"), A: Ident("test/scores"), V: TempID("3")},
+			{E: TempID("1"), A: Ident("test/scores"), V: TempID("4")},
+			{E: TempID("1"), A: Ident("test/title"), V: String("Algebra II")},
+			{E: TempID("2"), A: Ident("test/score"), V: Float(95.3)},
+			{E: TempID("2"), A: Ident("sys/db/rank"), V: Int(0)},
+			{E: TempID("3"), A: Ident("test/score"), V: Float(92.0)},
+			{E: TempID("3"), A: Ident("sys/db/rank"), V: Int(1)},
+			{E: TempID("4"), A: Ident("test/score"), V: Float(98.9)},
+			{E: TempID("4"), A: Ident("sys/db/rank"), V: Int(2)},
+		},
+	}
+	res := db.Write(req)
+	assert.NoError(t, res.Error)
+	assembler := NewAssembler(analyzer, res.Snapshot)
+	entity, err := Assemble(assembler, res.TempIDs[TempID("1")], (*Test)(nil))
+	assert.NoError(t, err)
+
+	expected := Test{
+		Title: "Algebra II",
+		// we're pretending order is important here, e.g. tests repeatedly taken over time
+		Scores: []float64{95.3, 92.0, 98.9},
+	}
+	assert.Equal(t, expected, entity)
+}
