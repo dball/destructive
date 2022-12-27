@@ -25,7 +25,7 @@ func TestShred(t *testing.T) {
 		shredder := NewShredder(models.BuildCachingAnalyzer())
 		epoch := time.Date(1969, 7, 20, 20, 17, 54, 0, time.UTC)
 		p := person{id: 23, name: "Donald", age: 48, Birthdate: epoch}
-		req, err := shredder.Shred(Document{Assertions: []any{p}})
+		req, ids, err := shredder.Shred(Document{Assertions: []any{p}})
 		assert.NoError(t, err)
 		expected := Request{
 			Claims: []Claim{
@@ -35,13 +35,14 @@ func TestShred(t *testing.T) {
 			},
 			Retractions: []Retraction{},
 		}
+		assert.Equal(t, []ERef{ID(23)}, ids)
 		assert.Equal(t, expected, req)
 	})
 
 	t.Run("retract", func(t *testing.T) {
 		shredder := NewShredder(models.BuildCachingAnalyzer())
 		p := person{id: 23, name: "Donald", age: 48}
-		req, err := shredder.Shred(Document{Retractions: []any{p}})
+		req, _, err := shredder.Shred(Document{Retractions: []any{p}})
 		assert.NoError(t, err)
 		expected := Request{
 			Claims: []Claim{},
@@ -60,7 +61,7 @@ func TestShred(t *testing.T) {
 	t.Run("non-empty uuid", func(t *testing.T) {
 		shredder := NewShredder(models.BuildCachingAnalyzer())
 		p := person{id: 23, name: "Donald", uuid: "the-uuid"}
-		req, err := shredder.Shred(Document{Assertions: []any{p}})
+		req, _, err := shredder.Shred(Document{Assertions: []any{p}})
 		assert.NoError(t, err)
 		expected := Request{
 			Claims: []Claim{
@@ -77,7 +78,7 @@ func TestShred(t *testing.T) {
 		four := 4
 		epoch := time.Date(1969, 7, 20, 20, 17, 54, 0, time.UTC)
 		p := person{name: "Donald", pets: &four, Deathdate: &epoch}
-		req, err := shredder.Shred(Document{Assertions: []any{p}})
+		req, ids, err := shredder.Shred(Document{Assertions: []any{p}})
 		assert.NoError(t, err)
 		expected := Request{
 			Claims: []Claim{
@@ -87,12 +88,13 @@ func TestShred(t *testing.T) {
 			},
 			Retractions: []Retraction{},
 		}
+		assert.Equal(t, []ERef{TempID("1")}, ids)
 		assert.Equal(t, expected, req)
 	})
 
 	t.Run("invalid values", func(t *testing.T) {
 		shredder := NewShredder(models.BuildCachingAnalyzer())
-		_, err := shredder.Shred(Document{Assertions: []any{5}})
+		_, _, err := shredder.Shred(Document{Assertions: []any{5}})
 		assert.Error(t, err)
 	})
 }
@@ -109,7 +111,7 @@ func TestRefs(t *testing.T) {
 		pabu := Person{Name: "Pabu"}
 		momo.BFF = &pabu
 		pabu.BFF = &momo
-		actual, err := shredder.Shred(Document{Assertions: []any{&momo, &pabu}})
+		actual, ids, err := shredder.Shred(Document{Assertions: []any{&momo, &pabu}})
 		assert.NoError(t, err)
 		expected := Request{
 			Claims: []Claim{
@@ -120,6 +122,7 @@ func TestRefs(t *testing.T) {
 			},
 			Retractions: []Retraction{},
 		}
+		assert.Equal(t, []ERef{TempID("1"), TempID("2")}, ids)
 		assert.Equal(t, expected, actual)
 	})
 }
@@ -137,7 +140,7 @@ func TestStructs(t *testing.T) {
 	t.Run("value struct field", func(t *testing.T) {
 		shredder := NewShredder(models.BuildCachingAnalyzer())
 		me := Person{Name: "Donald", Favorite: Book{Title: "Immortality"}}
-		actual, err := shredder.Shred(Document{Assertions: []any{me}})
+		actual, _, err := shredder.Shred(Document{Assertions: []any{me}})
 		assert.NoError(t, err)
 		expected := Request{
 			Claims: []Claim{
@@ -168,7 +171,7 @@ func TestMapFields(t *testing.T) {
 			"Immortality":          {Title: "Immortality", Author: "Milan Kundera"},
 			"Parable of the Sower": {Title: "Parable of the Sower", Author: "Octavia Butler"},
 		}}
-		actual, err := shredder.Shred(Document{Assertions: []any{me}})
+		actual, _, err := shredder.Shred(Document{Assertions: []any{me}})
 		assert.NoError(t, err)
 		// The order of map entries is not specified, so we must allow both permutations.
 		expected1 := Request{
@@ -219,7 +222,7 @@ func TestScalarSliceFields(t *testing.T) {
 			// we're pretending order is important here, e.g. tests repeatedly taken over time
 			Scores: []float64{95.3, 92.0, 98.9},
 		}
-		actual, err := shredder.Shred(Document{Assertions: []any{test}})
+		actual, _, err := shredder.Shred(Document{Assertions: []any{test}})
 		assert.NoError(t, err)
 		// TODO the thing we may need to add here is a retraction for the slice ref attr values.
 		// Either that, or a txn fn that compares ordered list values and computes the minimal
@@ -266,7 +269,7 @@ func TestStructSliceFields(t *testing.T) {
 				{Score: 98.9},
 			},
 		}
-		actual, err := shredder.Shred(Document{Assertions: []any{test}})
+		actual, _, err := shredder.Shred(Document{Assertions: []any{test}})
 		assert.NoError(t, err)
 		// TODO the thing we may need to add here is a retraction for the slice ref attr values.
 		// Either that, or a txn fn that compares ordered list values and computes the minimal

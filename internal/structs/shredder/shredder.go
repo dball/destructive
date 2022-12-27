@@ -16,9 +16,10 @@ type Document struct {
 	Assertions  []any
 }
 
-// Shredder shreds structs into claims.
+// Shredder shreds structs into claims. The ids slice will
+// contain the resolved ids or tempids of the assertions in the same order.
 type Shredder interface {
-	Shred(doc Document) (req Request, err error)
+	Shred(doc Document) (req Request, ids []ERef, err error)
 }
 
 // shredder is a stateful shredder.
@@ -47,11 +48,12 @@ func (s *shredder) nextTempID() TempID {
 	return TempID(strconv.FormatUint(uint64(id), 10))
 }
 
-func (s *shredder) Shred(doc Document) (req Request, err error) {
+func (s *shredder) Shred(doc Document) (req Request, ids []ERef, err error) {
 	confetti := confetti{
 		tempIDs:  make(map[TempID]ID, len(doc.Assertions)),
 		pointers: make(map[reflect.Value]TempID, len(doc.Assertions)),
 	}
+	ids = make([]ERef, 0, len(doc.Assertions))
 	// The likely size here is actually assertions*numFields
 	req.Claims = make([]Claim, 0, len(doc.Assertions))
 	req.Retractions = make([]Retraction, 0, len(doc.Retractions))
@@ -64,11 +66,13 @@ func (s *shredder) Shred(doc Document) (req Request, err error) {
 		req.Retractions = append(req.Retractions, *retraction)
 	}
 	for _, x := range doc.Assertions {
+		var tempID TempID
 		var claims []Claim
-		_, claims, err = s.assert(&confetti, x)
+		tempID, claims, err = s.assert(&confetti, x)
 		if err != nil {
 			return
 		}
+		ids = append(ids, tempID)
 		req.Claims = append(req.Claims, claims...)
 	}
 	for i, claim := range req.Claims {
@@ -89,6 +93,12 @@ func (s *shredder) Shred(doc Document) (req Request, err error) {
 			}
 		}
 	}
+	for i, e := range ids {
+		id := confetti.tempIDs[e.(TempID)]
+		if id != 0 {
+			ids[i] = id
+		}
+	}
 	return
 }
 
@@ -106,7 +116,8 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []Claim, 
 			err = NewError("shredder.nilStruct")
 			return
 		}
-		_, ok := confetti.pointers[ptr]
+		ok := false
+		e, ok = confetti.pointers[ptr]
 		if ok {
 			return
 		}
