@@ -16,4 +16,8 @@ func TestDatabase(t *testing.T) {
 		Assertions: []any{Person{Name: "Donald"}, Person{Name: "Stephen"}},
 	})
 	assert.NoError(t, res.Error)
+	assert.Len(t, res.IDs, 2)
+	for _, id := range res.IDs {
+		assert.Positive(t, id)
+	}
 }

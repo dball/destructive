@@ -82,4 +82,6 @@ type Response struct {
 	Snap *Snapshot
 	// Error specifies why a request was rejected.
 	Error error
+	// IDs contains the list of ids of the asserted entities in the same order.
+	IDs []uint64
 }

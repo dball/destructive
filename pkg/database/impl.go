@@ -75,7 +75,7 @@ func (db *localDatabase) Write(req Request) (res Response) {
 			return
 		}
 	}
-	ireq, _, err := shredder.NewShredder(db.analyzer).Shred(shredder.Document{
+	ireq, ids, err := shredder.NewShredder(db.analyzer).Shred(shredder.Document{
 		Retractions: req.Retractions,
 		Assertions:  req.Assertions,
 	})
@@ -92,7 +92,18 @@ func (db *localDatabase) Write(req Request) (res Response) {
 		snap:     ires.Snapshot,
 		analyzer: db.analyzer,
 	}
-	// TODO how to assign tempids back to the assertions? use the tempids!
+	n := len(req.Assertions)
+	res.IDs = make([]uint64, 0, n)
+	for i := 0; i < n; i++ {
+		switch id := ids[i].(type) {
+		case types.ID:
+			res.IDs = append(res.IDs, uint64(id))
+		case types.TempID:
+			res.IDs = append(res.IDs, uint64(ires.TempIDs[id]))
+		default:
+			panic("Unexpected id type")
+		}
+	}
 	// TODO how to assign txn id to the transaction entity, if any?
 	return
 }
