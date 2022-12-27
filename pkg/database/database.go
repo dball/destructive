@@ -1,30 +1,30 @@
 // Package database contains the public database types and functions for destructive.
 package database
 
-// Entity is a struct with any number of attr fields.
-type Entity = any
+import (
+	"reflect"
 
-// EntityPointer is a pointer to an entity. This is typically used to convey the
-// attr tag metadata rather than as a mutable reference.
-type EntityPointer = *Entity
+	"github.com/dball/destructive/internal/structs/assemblers"
+	"github.com/dball/destructive/internal/structs/models"
+	"github.com/dball/destructive/internal/types"
+)
 
 // Database is a mutable set of data.
 type Database interface {
 	// Read returns a immutable snapshot of data.
-	Read() Snapshot
+	Read() *Snapshot
 	// Write atomically applies the changes in the request to the database.
 	Write(req Request) Response
 }
 
 // Snapshot is an immutable set of data.
-type Snapshot interface {
-	Populate(entityPointer EntityPointer) (found bool)
-	Find(entityPointer EntityPointer, id uint64) (entity Entity, found bool)
-	FindUnique(entityPointer EntityPointer, attr string, value any) (entity Entity, found bool)
+type Snapshot struct {
+	snap     types.Snapshot
+	analyzer models.Analyzer
 }
 
 type typedSnapshot[T any] struct {
-	snapshot Snapshot
+	snapshot *Snapshot
 	pointer  *T
 }
 
@@ -35,10 +35,26 @@ type TypedSnapshot[T any] interface {
 }
 
 func (ts *typedSnapshot[T]) Find(id uint64) (entity *T, found bool) {
-	panic("TODO")
+	val := reflect.ValueOf(ts.pointer)
+	if val.Kind() != reflect.Pointer {
+		return
+	}
+	entityStruct := val.Elem()
+	_, err := models.Analyze(entityStruct.Type())
+	if err != nil {
+		return
+	}
+	assembler := assemblers.NewAssembler(ts.snapshot.analyzer, ts.snapshot.snap)
+	assembled, err := assemblers.Assemble(assembler, types.ID(id), ts.pointer)
+	if err != nil {
+		return
+	}
+	entity = &assembled
+	found = true
+	return
 }
 
-func BuildTypedSnapshot[T any](snapshot Snapshot, pointer *T) (ts TypedSnapshot[T]) {
+func BuildTypedSnapshot[T any](snapshot *Snapshot, pointer *T) (ts TypedSnapshot[T]) {
 	// TODO validate pointer is to a struct with attr tags
 	return &typedSnapshot[T]{snapshot: snapshot, pointer: pointer}
 }
@@ -48,22 +64,22 @@ func BuildTypedSnapshot[T any](snapshot Snapshot, pointer *T) (ts TypedSnapshot[
 type Request struct {
 	// Assertions is a list of entities whose attr tag fields will be present in the
 	// database after a successful write.
-	Assertions []Entity
+	Assertions []any
 	// Retractions is a list of entities whose attributes will be retracted from the
 	// database after a successful write.
-	Retractions []Entity
+	Retractions []any
 	// Transaction is an entity which, if given, provides attr tag fields that will be
 	// asserted on the transaction of a successful write.
-	Transaction Entity
+	Transaction any
 }
 
 // Response specifies the results of trying to write a request to a database.
 type Response struct {
 	// Transaction is the entity representation of the transaction, if successful. This will
 	// be the referent entity of the request if one was given.
-	Transaction Entity
-	// Snapshot is the immutable set of data after the request was written, or when it was rejected.
-	Snapshot Snapshot
+	Transaction any
+	// Snap is the immutable set of data after the request was written, or when it was rejected.
+	Snap *Snapshot
 	// Error specifies why a request was rejected.
 	Error error
 }
