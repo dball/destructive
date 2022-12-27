@@ -20,9 +20,23 @@ func TestDatabase(t *testing.T) {
 	for _, id := range res.IDs {
 		assert.Positive(t, id)
 	}
-	// TODO this should work with a nil person pointer
-	snapshot := BuildTypedSnapshot(res.Snap, &Person{})
-	person, ok := snapshot.Find(res.IDs[0])
-	assert.True(t, ok)
-	assert.Equal(t, Person{Name: "Donald"}, *person)
+
+	t.Run("find person", func(t *testing.T) {
+		// TODO this should work with a nil person pointer
+		snapshot := BuildTypedSnapshot(res.Snap, &Person{})
+		person, ok := snapshot.Find(res.IDs[0])
+		assert.True(t, ok)
+		assert.Equal(t, Person{Name: "Donald"}, *person)
+	})
+
+	t.Run("find different struct with overlapping field", func(t *testing.T) {
+		type Named struct {
+			PersonName string `attr:"person/name"`
+		}
+
+		snapshot := BuildTypedSnapshot(res.Snap, &Named{})
+		named, ok := snapshot.Find(res.IDs[1])
+		assert.True(t, ok)
+		assert.Equal(t, Named{PersonName: "Stephen"}, *named)
+	})
 }
