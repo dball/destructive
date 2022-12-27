@@ -1,8 +1,11 @@
 package database
 
 import (
+	"reflect"
+
 	"github.com/dball/destructive/internal/database"
 	"github.com/dball/destructive/internal/structs/models"
+	"github.com/dball/destructive/internal/structs/schemas"
 	"github.com/dball/destructive/internal/structs/shredder"
 	"github.com/dball/destructive/internal/types"
 )
@@ -53,7 +56,26 @@ func (db *localDatabase) Read() *Snapshot {
 }
 
 func (db *localDatabase) Write(req Request) (res Response) {
-	ireq, err := shredder.NewShredder(models.BuildCachingAnalyzer()).Shred(shredder.Document{
+	for _, assertion := range req.Assertions {
+		// TODO we should keep a registry of types whose attrs
+		// have been asserted in the database already.
+		claims, err := schemas.Analyze(reflect.TypeOf(assertion))
+		if err != nil {
+			res.Error = err
+			return
+		}
+		// TODO holy non-atomicity, batman. Probably we should accumulate
+		// all claims and at least write them all in one batch?
+		// For the subsequent data claims, perhaps the internal db write
+		// should accommodate a separate "ddl" claims form and handle
+		// a total reversion if the data claims have an error?
+		ires := db.db.Write(types.Request{Claims: claims})
+		if ires.Error != nil {
+			res.Error = ires.Error
+			return
+		}
+	}
+	ireq, err := shredder.NewShredder(db.analyzer).Shred(shredder.Document{
 		Retractions: req.Retractions,
 		Assertions:  req.Assertions,
 	})
