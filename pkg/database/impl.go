@@ -1,8 +1,6 @@
 package database
 
 import (
-	"reflect"
-
 	"github.com/dball/destructive/internal/database"
 	"github.com/dball/destructive/internal/structs/models"
 	"github.com/dball/destructive/internal/structs/shredder"
@@ -34,17 +32,24 @@ func NewDatabase(config Config) Database {
 	if identsSize == 0 {
 		attrsSize = defaultConfig.IdentsSize
 	}
-	return &localDatabase{db: database.NewIndexDatabase(degree, attrsSize, identsSize)}
+	return &localDatabase{
+		db:       database.NewIndexDatabase(degree, attrsSize, identsSize),
+		analyzer: models.BuildCachingAnalyzer(),
+	}
 }
 
 type localDatabase struct {
-	db types.Database
+	db       types.Database
+	analyzer models.Analyzer
 }
 
 var _ Database = (*localDatabase)(nil)
 
-func (db *localDatabase) Read() Snapshot {
-	return &localSnapshot{snap: db.db.Read()}
+func (db *localDatabase) Read() *Snapshot {
+	return &Snapshot{
+		snap:     db.db.Read(),
+		analyzer: db.analyzer,
+	}
 }
 
 func (db *localDatabase) Write(req Request) (res Response) {
@@ -61,47 +66,11 @@ func (db *localDatabase) Write(req Request) (res Response) {
 		res.Error = ires.Error
 		return
 	}
-	res.Snapshot = &localSnapshot{snap: ires.Snapshot}
+	res.Snap = &Snapshot{
+		snap:     ires.Snapshot,
+		analyzer: db.analyzer,
+	}
 	// TODO how to assign tempids back to the assertions?
 	// TODO how to assign txn id to the transaction entity, if any?
 	return
-}
-
-type localSnapshot struct {
-	snap types.Snapshot
-}
-
-var _ Snapshot = (*localSnapshot)(nil)
-
-func (snap *localSnapshot) Find(entity any) (found bool) {
-	val := reflect.ValueOf(entity)
-	if val.Kind() != reflect.Pointer {
-		return
-	}
-	strukt := val.Elem()
-	model, err := models.Analyze(strukt.Type())
-	if err != nil {
-		return
-	}
-	var id types.ID
-	for _, attrField := range model.AttrFields {
-		var fieldID types.ID
-		if attrField.Ident == types.Ident("sys/db/id") {
-			fieldID = types.ID(strukt.Field(attrField.Index).Uint())
-		}
-		if fieldID == 0 {
-			continue
-		}
-		if id == 0 {
-			id = fieldID
-		}
-		if id != fieldID {
-			return
-		}
-	}
-	if id == 0 {
-		return
-	}
-	found = true
-	panic("TODO Use assemblers")
 }
