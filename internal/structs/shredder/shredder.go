@@ -140,7 +140,7 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []Claim, 
 		fieldValue := fields.Field(attr.Index)
 		if attr.Ident == sys.DbId {
 			switch attr.FieldType.Kind() {
-			case reflect.Uint:
+			case reflect.Uint64:
 				fid := ID(fieldValue.Uint())
 				switch {
 				case id == 0:
@@ -251,7 +251,7 @@ func (s *shredder) retract(confetti *confetti, x any) (retraction *Retraction, e
 		fieldValue := fields.Field(attr.Index)
 		if attr.Ident == sys.DbId {
 			switch attr.FieldType.Kind() {
-			case reflect.Uint:
+			case reflect.Uint64:
 				if fieldValue.IsZero() {
 					continue
 				}

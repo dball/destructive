@@ -11,7 +11,7 @@ import (
 
 func TestShred(t *testing.T) {
 	type person struct {
-		id   uint   `attr:"sys/db/id"`
+		id   uint64 `attr:"sys/db/id"`
 		name string `attr:"person/name,identity"`
 		uuid string `attr:"person/uuid,unique,ignoreempty"`
 		age  int    `attr:"person/age,ignoreempty"`
