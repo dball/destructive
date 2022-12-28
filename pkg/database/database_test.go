@@ -68,4 +68,17 @@ func TestDatabase(t *testing.T) {
 		assert.NoError(t, res.Error)
 		assert.Len(t, res.IDs, 1)
 	})
+
+	t.Run("retract accepts a struct", func(t *testing.T) {
+		id := res.IDs[0]
+		res := db.Write(Request{
+			Retractions: []any{Person{ID: id}},
+		})
+		assert.NoError(t, res.Error)
+		snapshot, err := BuildTypedSnapshot(res.Snap, (*Person)(nil))
+		assert.NoError(t, err)
+		person, ok := snapshot.Find(id)
+		assert.False(t, ok)
+		assert.Nil(t, person)
+	})
 }
