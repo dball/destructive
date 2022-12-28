@@ -35,15 +35,6 @@ type TypedSnapshot[T any] interface {
 }
 
 func (ts *typedSnapshot[T]) Find(id uint64) (entity *T, found bool) {
-	val := reflect.ValueOf(ts.pointer)
-	if val.Kind() != reflect.Pointer {
-		return
-	}
-	entityStruct := val.Elem()
-	_, err := models.Analyze(entityStruct.Type())
-	if err != nil {
-		return
-	}
 	assembler := assemblers.NewAssembler(ts.snapshot.analyzer, ts.snapshot.snap)
 	assembled, err := assemblers.Assemble(assembler, types.ID(id), ts.pointer)
 	if err != nil {
@@ -54,9 +45,17 @@ func (ts *typedSnapshot[T]) Find(id uint64) (entity *T, found bool) {
 	return
 }
 
-func BuildTypedSnapshot[T any](snapshot *Snapshot, pointer *T) (ts TypedSnapshot[T]) {
-	// TODO validate pointer is to a struct with attr tags
-	return &typedSnapshot[T]{snapshot: snapshot, pointer: pointer}
+func BuildTypedSnapshot[T any](snapshot *Snapshot, pointer *T) (ts TypedSnapshot[T], err error) {
+	typ := reflect.TypeOf(pointer)
+	if typ.Kind() != reflect.Pointer {
+		err = types.NewError("database.invalidStructPointer", "type", typ)
+		return
+	}
+	_, err = models.Analyze(typ.Elem())
+	if err == nil {
+		ts = &typedSnapshot[T]{snapshot: snapshot, pointer: pointer}
+	}
+	return
 }
 
 // Request specifies changes to apply to a database. If a Request is written

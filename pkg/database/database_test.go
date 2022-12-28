@@ -24,7 +24,8 @@ func TestDatabase(t *testing.T) {
 
 	t.Run("find person", func(t *testing.T) {
 		// TODO this should work with a nil person pointer
-		snapshot := BuildTypedSnapshot(res.Snap, &Person{})
+		snapshot, err := BuildTypedSnapshot(res.Snap, (*Person)(nil))
+		assert.NoError(t, err)
 		person, ok := snapshot.Find(res.IDs[0])
 		assert.True(t, ok)
 		assert.Equal(t, Person{ID: res.IDs[0], Name: "Donald"}, *person)
@@ -35,7 +36,8 @@ func TestDatabase(t *testing.T) {
 			PersonName string `attr:"person/name"`
 		}
 
-		snapshot := BuildTypedSnapshot(res.Snap, &Named{})
+		snapshot, err := BuildTypedSnapshot(res.Snap, &Named{})
+		assert.NoError(t, err)
 		named, ok := snapshot.Find(res.IDs[1])
 		assert.True(t, ok)
 		assert.Equal(t, Named{PersonName: "Stephen"}, *named)
@@ -43,12 +45,14 @@ func TestDatabase(t *testing.T) {
 
 	t.Run("rename person changes future reads but not past reads", func(t *testing.T) {
 		id := res.IDs[0]
-		snapshot1 := BuildTypedSnapshot(res.Snap, &Person{})
+		snapshot1, err := BuildTypedSnapshot(res.Snap, &Person{})
+		assert.NoError(t, err)
 		res = db.Write(Request{
 			Assertions: []any{Person{ID: id, Name: "Donato"}},
 		})
 		assert.NoError(t, res.Error)
-		snapshot2 := BuildTypedSnapshot(res.Snap, &Person{})
+		snapshot2, err := BuildTypedSnapshot(res.Snap, &Person{})
+		assert.NoError(t, err)
 		person, ok := snapshot2.Find(id)
 		assert.True(t, ok)
 		assert.Equal(t, Person{ID: id, Name: "Donato"}, *person)
