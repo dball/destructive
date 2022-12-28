@@ -57,9 +57,13 @@ func (db *localDatabase) Read() *Snapshot {
 
 func (db *localDatabase) Write(req Request) (res Response) {
 	for _, assertion := range req.Assertions {
+		typ := reflect.TypeOf(assertion)
+		if typ.Kind() == reflect.Pointer {
+			typ = typ.Elem()
+		}
 		// TODO we should keep a registry of types whose attrs
 		// have been asserted in the database already.
-		claims, err := schemas.Analyze(reflect.TypeOf(assertion))
+		claims, err := schemas.Analyze(typ)
 		if err != nil {
 			res.Error = err
 			return

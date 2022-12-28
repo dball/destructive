@@ -56,4 +56,12 @@ func TestDatabase(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, Person{ID: id, Name: "Donald"}, *person)
 	})
+
+	t.Run("assert accepts struct pointers as well as structs literals", func(t *testing.T) {
+		res = db.Write(Request{
+			Assertions: []any{&Person{Name: "Octavia"}},
+		})
+		assert.NoError(t, res.Error)
+		assert.Len(t, res.IDs, 1)
+	})
 }
