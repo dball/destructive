@@ -264,7 +264,7 @@ func (s *shredder) retract(confetti *confetti, x any) (retraction *Retraction, e
 					err = NewError("shredder.inconsistentEs", "id1", e, "id2", id)
 					return
 				}
-				constraints[ID(fieldValue.Uint())] = Void{}
+				constraints[ID(fieldValue.Uint())] = Void{} // TODO redundant? broken?
 			default:
 				err = NewError("shredder.invalidIdFieldType", "type", attr.FieldType)
 				return
