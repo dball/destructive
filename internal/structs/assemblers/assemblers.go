@@ -222,12 +222,14 @@ func (as *assembler) assemble(id ID, ptr reflect.Value) (err error) {
 			}
 		}
 	}
-	if foundAny {
-		attr, ok := model.Attr(Ident(sys.DbId))
-		if ok {
-			field := value.Field(attr.Index)
-			field.SetUint(uint64(id))
-		}
+	if !foundAny {
+		as.instances[id] = reflect.ValueOf(nil)
+		return
+	}
+	attr, ok := model.Attr(Ident(sys.DbId))
+	if ok {
+		field := value.Field(attr.Index)
+		field.SetUint(uint64(id))
 	}
 	maes, ok := as.mapsAwaitingEntries[id]
 	if ok {
@@ -314,7 +316,7 @@ func (as *assembler) addEntityToSlice(collValue Ident, slice reflect.Value, id I
 	}
 }
 
-func Assemble[T any](as *assembler, id ID, entityPointer *T) (entity T, err error) {
+func Assemble[T any](as *assembler, id ID, entityPointer *T) (entity *T, err error) {
 	pointerType := reflect.TypeOf(entityPointer)
 	if pointerType.Kind() != reflect.Pointer {
 		err = NewError("assembler.destNotPointer")
@@ -339,10 +341,14 @@ func Assemble[T any](as *assembler, id ID, entityPointer *T) (entity T, err erro
 			return
 		}
 	}
+	if instance == reflect.ValueOf(nil) {
+		return
+	}
 	extant := instance.Elem().Interface()
-	entity, ok = extant.(T)
+	it, ok := extant.(T)
 	if !ok {
 		err = NewError("assembler.typeConflictForID", "id", id, "extant", extant, "type", structType)
 	}
+	entity = &it
 	return
 }

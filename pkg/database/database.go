@@ -31,17 +31,13 @@ type typedSnapshot[T any] struct {
 // TypedSnapshot is an immutable set of data that can build instances of specific
 // struct types.
 type TypedSnapshot[T any] interface {
-	Find(id uint64) (entity *T, found bool)
+	Find(id uint64) (entity *T)
 }
 
-func (ts *typedSnapshot[T]) Find(id uint64) (entity *T, found bool) {
+func (ts *typedSnapshot[T]) Find(id uint64) (entity *T) {
 	assembler := assemblers.NewAssembler(ts.snapshot.analyzer, ts.snapshot.snap)
-	assembled, err := assemblers.Assemble(assembler, types.ID(id), ts.pointer)
-	if err != nil {
-		return
-	}
-	entity = &assembled
-	found = true
+	// TODO log the error or something?
+	entity, _ = assemblers.Assemble(assembler, types.ID(id), ts.pointer)
 	return
 }
 

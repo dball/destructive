@@ -26,8 +26,7 @@ func TestDatabase(t *testing.T) {
 		// TODO this should work with a nil person pointer
 		snapshot, err := BuildTypedSnapshot(res.Snap, (*Person)(nil))
 		assert.NoError(t, err)
-		person, ok := snapshot.Find(res.IDs[0])
-		assert.True(t, ok)
+		person := snapshot.Find(res.IDs[0])
 		assert.Equal(t, Person{ID: res.IDs[0], Name: "Donald"}, *person)
 	})
 
@@ -38,8 +37,7 @@ func TestDatabase(t *testing.T) {
 
 		snapshot, err := BuildTypedSnapshot(res.Snap, &Named{})
 		assert.NoError(t, err)
-		named, ok := snapshot.Find(res.IDs[1])
-		assert.True(t, ok)
+		named := snapshot.Find(res.IDs[1])
 		assert.Equal(t, Named{PersonName: "Stephen"}, *named)
 	})
 
@@ -53,11 +51,9 @@ func TestDatabase(t *testing.T) {
 		assert.NoError(t, res.Error)
 		snapshot2, err := BuildTypedSnapshot(res.Snap, &Person{})
 		assert.NoError(t, err)
-		person, ok := snapshot2.Find(id)
-		assert.True(t, ok)
+		person := snapshot2.Find(id)
 		assert.Equal(t, Person{ID: id, Name: "Donato"}, *person)
-		person, ok = snapshot1.Find(id)
-		assert.True(t, ok)
+		person = snapshot1.Find(id)
 		assert.Equal(t, Person{ID: id, Name: "Donald"}, *person)
 	})
 
@@ -77,8 +73,7 @@ func TestDatabase(t *testing.T) {
 		assert.NoError(t, res.Error)
 		snapshot, err := BuildTypedSnapshot(res.Snap, (*Person)(nil))
 		assert.NoError(t, err)
-		person, ok := snapshot.Find(id)
-		assert.False(t, ok)
+		person := snapshot.Find(id)
 		assert.Nil(t, person)
 	})
 }

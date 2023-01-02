@@ -81,7 +81,7 @@ func TestSimple(t *testing.T) {
 		Born:         born,
 		Died:         &died,
 	}
-	assert.Equal(t, expected, entity)
+	assert.Equal(t, expected, *entity)
 }
 
 func TestStructs(t *testing.T) {
@@ -114,7 +114,7 @@ func TestStructs(t *testing.T) {
 	entity, err := Assemble(assembler, id, (*Person)(nil))
 	assert.NoError(t, err)
 	expected := Person{Name: "Donald", Favorite: Book{Title: "Immortality"}, Best: &Book{Title: "The Parable of the Sower"}}
-	assert.Equal(t, expected, entity)
+	assert.Equal(t, expected, *entity)
 }
 
 func TestStructCycles(t *testing.T) {
@@ -257,7 +257,7 @@ func TestSliceOfStructValues(t *testing.T) {
 			{Title: "Legendborn"},
 		},
 	}
-	assert.Equal(t, expected, entity)
+	assert.Equal(t, expected, *entity)
 }
 
 func TestSliceOfScalarValues(t *testing.T) {
@@ -292,5 +292,5 @@ func TestSliceOfScalarValues(t *testing.T) {
 		// we're pretending order is important here, e.g. tests repeatedly taken over time
 		Scores: []float64{95.3, 92.0, 98.9},
 	}
-	assert.Equal(t, expected, entity)
+	assert.Equal(t, expected, *entity)
 }
