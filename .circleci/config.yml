@@ -5,6 +5,7 @@ version: 2.1
 parameters:
   the-param-name:
     type: string
+    default:
 
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/jobs-steps/#jobs-overview & https://circleci.com/docs/configuration-reference/#jobs
