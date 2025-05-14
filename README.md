@@ -9,6 +9,7 @@ Destructive is an experiment in indexed data storage in Golang, specifically foc
 * I often need to convert from one type of struct to another with very similar or identical data.
 * I am convinced the datum rdf model is widely applicable and underused.
 
+
 ## Constraints
 
 * I only care about local storage at this time. Durable data storage and interchange are goals, but not immediate.
