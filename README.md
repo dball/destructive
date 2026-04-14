@@ -2,7 +2,6 @@
 
 Destructive is an experiment in indexed data storage in Golang, specifically focused on storing and querying structs.
 
-
 ## Motivations
 
 * I often have large numbers of structs in a collection that I need to search in various ways.
