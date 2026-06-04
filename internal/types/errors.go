@@ -2,6 +2,7 @@ package types
 
 import "fmt"
 
+// TODO consider revising towards a trait approach
 type Error struct {
 	Code    string
 	Context map[string]any
