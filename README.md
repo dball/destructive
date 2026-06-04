@@ -207,10 +207,15 @@ Fields may contain maps of structs indexed by values that may or may not be pres
 type Person struct {
   Name string `attr:"person/name"`
   FavoriteBooks map[string]Book `attr:"person/favorite-books,key=book/title"`
+  FavoriteBooks2 map[string]Book2 `attr:"person/favorite-books,key=book/title"`
 }
 
 type Book struct {
   Name string `attr:"book/title"`
+  Author string `attr:"book/author"`
+}
+
+type Book2 struct {
   Author string `attr:"book/author"`
 }
 ```
