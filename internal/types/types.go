@@ -12,6 +12,7 @@ type Void struct{}
 
 // Value is an immutable scalar. Nil is not a valid value.
 type Value interface {
+	String() string
 	IsZero() bool
 }
 
@@ -22,6 +23,8 @@ func (id ID) String() string {
 	return fmt.Sprintf("#id(%d)", uint64(id))
 }
 
+var _ Value = ID(0)
+
 // String is a string.
 type String string
 
@@ -29,12 +32,16 @@ func (s String) String() string {
 	return fmt.Sprintf("#str(\"%s\"", string(s))
 }
 
+var _ Value = String("")
+
 // Int is a signed integer.
 type Int int64
 
 func (i Int) String() string {
 	return fmt.Sprintf("#int(%d)", int64(i))
 }
+
+var _ Value = Int(0)
 
 // Bool is a boolean.
 type Bool bool
@@ -47,12 +54,19 @@ func (b Bool) String() string {
 	}
 }
 
+var _ Value = Bool(false)
+
 // Inst is a instant in time.
 type Inst time.Time
 
 func (inst Inst) String() string {
 	return fmt.Sprintf("#inst(\"%s\")", time.Time(inst).Format(time.RFC3339))
 }
+
+// TimeType is the type of golang's Time value.
+var TimeType = reflect.TypeFor[time.Time]()
+
+var _ Value = Inst(time.Time{})
 
 // Float is a floating-point number.
 type Float float64
@@ -61,8 +75,7 @@ func (f Float) String() string {
 	return fmt.Sprintf("#float(%v)", float64(f))
 }
 
-// TimeType is the type of golang's Time value.
-var TimeType = reflect.TypeFor[time.Time]()
+var _ Value = Float(0)
 
 // These are the system values.
 
@@ -94,16 +107,13 @@ func D(e ID, a ID, v Value, t ID) Datum {
 	return Datum{e, a, v, t}
 }
 
-// Ident is a globally unique system identifier for an entity, generally used for attributes.
-type Ident string
-
 // IDRef is a value that may resolve to an attribute id.
 type IDRef interface {
 	IsIDRef()
 }
 
-func (ID) IsIDRef()    {}
-func (Ident) IsIDRef() {}
+// Ident is a globally unique system identifier for an entity, generally used for attributes.
+type Ident string
 
 // LookupRef is a combination of a unique attribute ref and a value, which may resolve to an entity id.
 type LookupRef struct {
@@ -112,4 +122,6 @@ type LookupRef struct {
 	V Value
 }
 
+func (ID) IsIDRef()        {}
+func (Ident) IsIDRef()     {}
 func (LookupRef) IsIDRef() {}
