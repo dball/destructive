@@ -12,7 +12,7 @@ type Void struct{}
 
 // Value is an immutable scalar. Nil is not a valid value.
 type Value interface {
-	IsEmpty() bool
+	IsZero() bool
 }
 
 // ID is issued by the system and never reused. 0 is not a valid id.
@@ -62,16 +62,16 @@ func (f Float) String() string {
 }
 
 // TimeType is the type of golang's Time value.
-var TimeType = reflect.TypeOf(time.Time{})
+var TimeType = reflect.TypeFor[time.Time]()
 
 // These are the system values.
 
-func (x ID) IsEmpty() bool     { return uint64(x) == 0 }
-func (x String) IsEmpty() bool { return string(x) == "" }
-func (x Int) IsEmpty() bool    { return int64(x) == 0 }
-func (x Bool) IsEmpty() bool   { return !bool(x) }
-func (x Inst) IsEmpty() bool   { return time.Time(x).IsZero() }
-func (x Float) IsEmpty() bool  { return float64(x) == 0 }
+func (x ID) IsZero() bool     { return uint64(x) == 0 }
+func (x String) IsZero() bool { return string(x) == "" }
+func (x Int) IsZero() bool    { return int64(x) == 0 }
+func (x Bool) IsZero() bool   { return !bool(x) }
+func (x Inst) IsZero() bool   { return time.Time(x).IsZero() }
+func (x Float) IsZero() bool  { return float64(x) == 0 }
 
 // Datum is the fundamental data model.
 type Datum struct {

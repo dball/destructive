@@ -168,7 +168,7 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []Claim, 
 		switch v := val.(type) {
 		case Value:
 			vref = v.(VRef)
-			if attr.IgnoreEmpty && v.IsEmpty() {
+			if attr.IgnoreEmpty && v.IsZero() {
 				continue
 			}
 		case TempID:
@@ -286,7 +286,7 @@ func (s *shredder) retract(confetti *confetti, x any) (retraction *Retraction, e
 		if !ok {
 			continue
 		}
-		if attr.IgnoreEmpty && v.IsEmpty() {
+		if attr.IgnoreEmpty && v.IsZero() {
 			continue
 		}
 		constraints[LookupRef{A: attr.Ident, V: v}] = Void{}
