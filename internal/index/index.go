@@ -2,6 +2,7 @@
 package index
 
 import (
+	"iter"
 	"math"
 	"time"
 
@@ -72,9 +73,9 @@ type Index interface {
 	// Delete ensures no datum with the given datum's eav values is present in the indexed set.
 	// If this returns true, a datum was deleted in so doing.
 	Delete(datum Datum) (extant bool)
-	// Select returns an iterator of datums that match the given datum according to the partial
+	// Select returns a sequence of datums that match the given datum according to the partial
 	// index.
-	Select(p PartialIndex, datum Datum) (iter *iterator.Iterator[Datum])
+	Select(p PartialIndex, datum Datum) iter.Seq[Datum]
 	// First returns the first datum matching the partial index, if any.
 	First(p PartialIndex, datum Datum) (match Datum, extant bool)
 	// Count returns the number of datums matching the partial index.
@@ -215,66 +216,48 @@ func (idx *CompositeIndex) Delete(datum Datum) (extant bool) {
 	return
 }
 
-type polyTypeIterator struct {
-	idx     *CompositeIndex
-	strings *iterator.Iterator[Datum]
-	ints    *iterator.Iterator[Datum]
-	uints   *iterator.Iterator[Datum]
-	floats  *iterator.Iterator[Datum]
+// TODO our sequences could maintain eav sorting if we build sorted peekahead.
+// As is, the typed sub-sequences are concatenated, so datums are grouped by storage
+// type rather than globally eav-sorted.
+
+// reint maps a datum drawn from the int-typed index to its datum Value, accounting
+// for attributes (inst) whose values are stored as ints.
+func (idx *CompositeIndex) reint(datum Datum) Datum {
+	switch idx.attrTypes[datum.A] {
+	case sys.AttrTypeInt:
+	case sys.AttrTypeInst:
+		datum.V = instValuer.valuer(int64(datum.V.(Int)))
+	default:
+		panic("index.typed.int.corrupt")
+	}
+	return datum
 }
 
-// TODO our iterators could maintain eav sorting if we build sorted peekahead
-func (poly *polyTypeIterator) Each(accept iterator.Accept[Datum]) {
-	var iter *iterator.Iterator[Datum]
-	iter = poly.strings
-	for iter.Next() {
-		if !accept(iter.Value()) {
-			iter.Stop()
-			poly.ints.Stop()
-			poly.uints.Stop()
-			poly.floats.Stop()
-		}
+// reuint maps a datum drawn from the uint-typed index to its datum Value, accounting
+// for attributes (bool) whose values are stored as uints.
+func (idx *CompositeIndex) reuint(datum Datum) Datum {
+	switch idx.attrTypes[datum.A] {
+	case sys.AttrTypeRef:
+	case sys.AttrTypeBool:
+		datum.V = boolValuer.valuer(uint64(datum.V.(ID)))
+	default:
+		panic("index.typed.uint.corrupt")
 	}
-	iter = poly.ints
-	for iter.Next() {
-		datum := iter.Value()
-		switch poly.idx.attrTypes[datum.A] {
-		case sys.AttrTypeInt:
-		case sys.AttrTypeInst:
-			datum.V = instValuer.valuer(int64(datum.V.(Int)))
-		default:
-			panic("index.typed.int.corrupt")
-		}
-		if !accept(datum) {
-			iter.Stop()
-			poly.uints.Stop()
-			poly.floats.Stop()
-		}
-	}
-	iter = poly.uints
-	for iter.Next() {
-		datum := iter.Value()
-		switch poly.idx.attrTypes[datum.A] {
-		case sys.AttrTypeRef:
-		case sys.AttrTypeBool:
-			datum.V = boolValuer.valuer(uint64(datum.V.(ID)))
-		default:
-			panic("index.typed.uint.corrupt")
-		}
-		if !accept(datum) {
-			iter.Stop()
-			poly.floats.Stop()
-		}
-	}
-	iter = poly.floats
-	for iter.Next() {
-		if !accept(iter.Value()) {
-			iter.Stop()
+	return datum
+}
+
+// mapSeq returns a sequence that applies f to each datum yielded by seq.
+func mapSeq(seq iter.Seq[Datum], f func(Datum) Datum) iter.Seq[Datum] {
+	return func(yield func(Datum) bool) {
+		for datum := range seq {
+			if !yield(f(datum)) {
+				return
+			}
 		}
 	}
 }
 
-func (idx *CompositeIndex) Select(p PartialIndex, datum Datum) (iter *iterator.Iterator[Datum]) {
+func (idx *CompositeIndex) Select(p PartialIndex, datum Datum) (seq iter.Seq[Datum]) {
 	// TODO should idx ensure p is legit for its type? This would just be a cross check against the
 	// database misusing its indexes.
 	if p == E {
@@ -282,75 +265,77 @@ func (idx *CompositeIndex) Select(p PartialIndex, datum Datum) (iter *iterator.I
 		ints := idx.ints.Select(CompareE[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E})
 		uints := idx.uints.Select(CompareE[uint64], refValuer.valuer, TypedDatum[uint64]{E: datum.E})
 		floats := idx.floats.Select(CompareE[float64], floatValuer.valuer, TypedDatum[float64]{E: datum.E})
-		iter = iterator.BuildIterator[Datum](&polyTypeIterator{idx, strings, ints, uints, floats})
+		// Concatenate the typed sub-sequences, mapping the int and uint datums through
+		// the transforms that recover inst and bool values from their stored representation.
+		seq = iterator.Concat(strings, mapSeq(ints, idx.reint), mapSeq(uints, idx.reuint), floats)
 		return
 	}
 	switch idx.attrTypes[datum.A] {
 	case sys.AttrTypeString:
 		switch p {
 		case EA:
-			iter = idx.strings.Select(CompareEA[string], stringValuer.valuer, TypedDatum[string]{E: datum.E, A: datum.A})
+			seq = idx.strings.Select(CompareEA[string], stringValuer.valuer, TypedDatum[string]{E: datum.E, A: datum.A})
 		case AE:
-			iter = idx.strings.Select(CompareAE[string], stringValuer.valuer, TypedDatum[string]{E: datum.E, A: datum.A})
+			seq = idx.strings.Select(CompareAE[string], stringValuer.valuer, TypedDatum[string]{E: datum.E, A: datum.A})
 		case A:
-			iter = idx.strings.Select(CompareA[string], stringValuer.valuer, TypedDatum[string]{A: datum.A})
+			seq = idx.strings.Select(CompareA[string], stringValuer.valuer, TypedDatum[string]{A: datum.A})
 		case AV:
-			iter = idx.strings.Select(CompareAV[string], stringValuer.valuer, TypedDatum[string]{A: datum.A, V: stringValuer.devaluer(datum.V)})
+			seq = idx.strings.Select(CompareAV[string], stringValuer.valuer, TypedDatum[string]{A: datum.A, V: stringValuer.devaluer(datum.V)})
 		}
 	case sys.AttrTypeInt:
 		switch p {
 		case EA:
-			iter = idx.ints.Select(CompareEA[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
+			seq = idx.ints.Select(CompareEA[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
 		case AE:
-			iter = idx.ints.Select(CompareAE[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
+			seq = idx.ints.Select(CompareAE[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
 		case A:
-			iter = idx.ints.Select(CompareA[int64], intValuer.valuer, TypedDatum[int64]{A: datum.A, V: math.MinInt64})
+			seq = idx.ints.Select(CompareA[int64], intValuer.valuer, TypedDatum[int64]{A: datum.A, V: math.MinInt64})
 		case AV:
-			iter = idx.ints.Select(CompareAV[int64], intValuer.valuer, TypedDatum[int64]{A: datum.A, V: intValuer.devaluer(datum.V)})
+			seq = idx.ints.Select(CompareAV[int64], intValuer.valuer, TypedDatum[int64]{A: datum.A, V: intValuer.devaluer(datum.V)})
 		}
 	case sys.AttrTypeRef:
 		switch p {
 		case EA:
-			iter = idx.uints.Select(CompareEA[uint64], refValuer.valuer, TypedDatum[uint64]{E: datum.E, A: datum.A})
+			seq = idx.uints.Select(CompareEA[uint64], refValuer.valuer, TypedDatum[uint64]{E: datum.E, A: datum.A})
 		case AE:
-			iter = idx.uints.Select(CompareAE[uint64], refValuer.valuer, TypedDatum[uint64]{E: datum.E, A: datum.A})
+			seq = idx.uints.Select(CompareAE[uint64], refValuer.valuer, TypedDatum[uint64]{E: datum.E, A: datum.A})
 		case A:
-			iter = idx.uints.Select(CompareA[uint64], refValuer.valuer, TypedDatum[uint64]{A: datum.A})
+			seq = idx.uints.Select(CompareA[uint64], refValuer.valuer, TypedDatum[uint64]{A: datum.A})
 		case AV:
-			iter = idx.uints.Select(CompareAV[uint64], refValuer.valuer, TypedDatum[uint64]{A: datum.A, V: refValuer.devaluer(datum.V)})
+			seq = idx.uints.Select(CompareAV[uint64], refValuer.valuer, TypedDatum[uint64]{A: datum.A, V: refValuer.devaluer(datum.V)})
 		}
 	case sys.AttrTypeFloat:
 		switch p {
 		case EA:
-			iter = idx.floats.Select(CompareEA[float64], floatValuer.valuer, TypedDatum[float64]{E: datum.E, A: datum.A})
+			seq = idx.floats.Select(CompareEA[float64], floatValuer.valuer, TypedDatum[float64]{E: datum.E, A: datum.A})
 		case AE:
-			iter = idx.floats.Select(CompareAE[float64], floatValuer.valuer, TypedDatum[float64]{E: datum.E, A: datum.A})
+			seq = idx.floats.Select(CompareAE[float64], floatValuer.valuer, TypedDatum[float64]{E: datum.E, A: datum.A})
 		case A:
-			iter = idx.floats.Select(CompareA[float64], floatValuer.valuer, TypedDatum[float64]{A: datum.A})
+			seq = idx.floats.Select(CompareA[float64], floatValuer.valuer, TypedDatum[float64]{A: datum.A})
 		case AV:
-			iter = idx.floats.Select(CompareAV[float64], floatValuer.valuer, TypedDatum[float64]{A: datum.A, V: floatValuer.devaluer(datum.V)})
+			seq = idx.floats.Select(CompareAV[float64], floatValuer.valuer, TypedDatum[float64]{A: datum.A, V: floatValuer.devaluer(datum.V)})
 		}
 	case sys.AttrTypeBool:
 		switch p {
 		case EA:
-			iter = idx.uints.Select(CompareEA[uint64], boolValuer.valuer, TypedDatum[uint64]{E: datum.E, A: datum.A})
+			seq = idx.uints.Select(CompareEA[uint64], boolValuer.valuer, TypedDatum[uint64]{E: datum.E, A: datum.A})
 		case AE:
-			iter = idx.uints.Select(CompareAE[uint64], boolValuer.valuer, TypedDatum[uint64]{E: datum.E, A: datum.A})
+			seq = idx.uints.Select(CompareAE[uint64], boolValuer.valuer, TypedDatum[uint64]{E: datum.E, A: datum.A})
 		case A:
-			iter = idx.uints.Select(CompareA[uint64], boolValuer.valuer, TypedDatum[uint64]{A: datum.A})
+			seq = idx.uints.Select(CompareA[uint64], boolValuer.valuer, TypedDatum[uint64]{A: datum.A})
 		case AV:
-			iter = idx.uints.Select(CompareAV[uint64], boolValuer.valuer, TypedDatum[uint64]{A: datum.A, V: boolValuer.devaluer(datum.V)})
+			seq = idx.uints.Select(CompareAV[uint64], boolValuer.valuer, TypedDatum[uint64]{A: datum.A, V: boolValuer.devaluer(datum.V)})
 		}
 	case sys.AttrTypeInst:
 		switch p {
 		case EA:
-			iter = idx.ints.Select(CompareEA[int64], instValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
+			seq = idx.ints.Select(CompareEA[int64], instValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
 		case AE:
-			iter = idx.ints.Select(CompareAE[int64], instValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
+			seq = idx.ints.Select(CompareAE[int64], instValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
 		case A:
-			iter = idx.ints.Select(CompareA[int64], instValuer.valuer, TypedDatum[int64]{A: datum.A, V: math.MinInt64})
+			seq = idx.ints.Select(CompareA[int64], instValuer.valuer, TypedDatum[int64]{A: datum.A, V: math.MinInt64})
 		case AV:
-			iter = idx.ints.Select(CompareAV[int64], instValuer.valuer, TypedDatum[int64]{A: datum.A, V: instValuer.devaluer(datum.V)})
+			seq = idx.ints.Select(CompareAV[int64], instValuer.valuer, TypedDatum[int64]{A: datum.A, V: instValuer.devaluer(datum.V)})
 		}
 	}
 	return

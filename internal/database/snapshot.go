@@ -1,8 +1,9 @@
 package database
 
 import (
+	"iter"
+
 	"github.com/dball/destructive/internal/index"
-	"github.com/dball/destructive/internal/iterator"
 	. "github.com/dball/destructive/internal/types"
 )
 
@@ -17,7 +18,7 @@ type indexSnapshot struct {
 
 var _ Snapshot = (*indexSnapshot)(nil)
 
-func (snapshot *indexSnapshot) Select(claim Claim) (datums *iterator.Iterator[Datum]) {
+func (snapshot *indexSnapshot) Select(claim Claim) (datums iter.Seq[Datum]) {
 	match := snapshot.resolveClaim(claim)
 	hasE := match.E != 0
 	hasA := match.A != 0

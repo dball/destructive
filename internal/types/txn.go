@@ -1,9 +1,8 @@
 package types
 
 import (
+	"iter"
 	"time"
-
-	"github.com/dball/destructive/internal/iterator"
 )
 
 // TempID is a value that will resolve to a system id when a claim is asserted.
@@ -122,7 +121,7 @@ type Database interface {
 type Snapshot interface {
 	// Select returns an iterator of datums matching the claim. Empty values in the
 	// claim's fields indicate all values will match.
-	Select(claim Claim) *iterator.Iterator[Datum]
+	Select(claim Claim) iter.Seq[Datum]
 	// Count returns the number of datums matching the claim.
 	Count(claim Claim) (count int)
 	// Find returns the datum matching the claim, if any.

@@ -2,8 +2,8 @@ package index
 
 import (
 	"cmp"
+	"iter"
 
-	"github.com/dball/destructive/internal/iterator"
 	. "github.com/dball/destructive/internal/types"
 
 	"github.com/google/btree"
@@ -40,10 +40,10 @@ type TypedIndex[X cmp.Ordered] interface {
 	// Clone returns a copy of the index. Both the original and the clone may be changed hereafter
 	// without either affecting the other.
 	Clone() (clone TypedIndex[X])
-	// Select returns an ascending iterator of datums starting at the point datum would occupy in the
+	// Select returns an ascending sequence of datums starting at the point datum would occupy in the
 	// ordered set for which the comparer returns 0. The v values of those datums are converted from
 	// indexed storage values to datum Values with the valuer function.
-	Select(comparer Comparer[X], valuer Valuer[X], datum TypedDatum[X]) (iter *iterator.Iterator[Datum])
+	Select(comparer Comparer[X], valuer Valuer[X], datum TypedDatum[X]) iter.Seq[Datum]
 	// Count returns the number of datums starting at the point datum would occupy in the ordered
 	// set for which the comparer returns 0.
 	Count(comparer Comparer[X], datum TypedDatum[X]) (count int)
@@ -91,28 +91,19 @@ func (index *btreeIndex[X]) Clone() (clone TypedIndex[X]) {
 	return &btreeIndex[X]{tree: index.tree.Clone()}
 }
 
-type selection[X cmp.Ordered] struct {
-	idx      *btreeIndex[X]
-	comparer Comparer[X]
-	datum    TypedDatum[X]
-	valuer   Valuer[X]
-}
-
-func (sel *selection[X]) Each(accept iterator.Accept[Datum]) {
-	sel.idx.tree.AscendGreaterOrEqual(sel.datum, func(datum TypedDatum[X]) bool {
-		switch sel.comparer(sel.datum, datum) {
-		case 0:
-			return accept(Datum{E: datum.E, A: datum.A, V: sel.valuer(datum.V), T: datum.T})
-		case 1, -1:
-			return false
-		default:
-			panic("index.typed.selection.each")
-		}
-	})
-}
-
-func (idx *btreeIndex[X]) Select(comparer Comparer[X], valuer Valuer[X], datum TypedDatum[X]) (iter *iterator.Iterator[Datum]) {
-	return iterator.BuildIterator[Datum](&selection[X]{idx, comparer, datum, valuer})
+func (idx *btreeIndex[X]) Select(comparer Comparer[X], valuer Valuer[X], datum TypedDatum[X]) iter.Seq[Datum] {
+	return func(yield func(Datum) bool) {
+		idx.tree.AscendGreaterOrEqual(datum, func(d TypedDatum[X]) bool {
+			switch comparer(datum, d) {
+			case 0:
+				return yield(Datum{E: d.E, A: d.A, V: valuer(d.V), T: d.T})
+			case 1, -1:
+				return false
+			default:
+				panic("index.typed.selection.select")
+			}
+		})
+	}
 }
 
 func (idx *btreeIndex[X]) First(comparer Comparer[X], valuer Valuer[X], datum TypedDatum[X]) (match Datum, extant bool) {

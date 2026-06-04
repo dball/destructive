@@ -102,11 +102,9 @@ func (as *assembler) assemble(id ID, ptr reflect.Value) (err error) {
 
 	// We know the A's in which we're interested, so we could be more selective (heh) here
 	// if we had reason to believe the snapshot E had many more A's.
-	iter := as.snapshot.Select(Claim{E: id})
 	foundAny := false
-	for iter.Next() {
+	for datum := range as.snapshot.Select(Claim{E: id}) {
 		foundAny = true
-		datum := iter.Value()
 		ident := as.snapshot.ResolveAttrIdent(datum.A)
 		attr, ok := model.Attr(ident)
 		if !ok {
@@ -251,25 +249,24 @@ func (as *assembler) assemble(id ID, ptr reflect.Value) (err error) {
 
 func (as *assembler) findValue(e ID, a Ident) (v any) {
 	// TODO snapshot should support SelectOne?
-	iter := as.snapshot.Select(Claim{E: e, A: a})
-	if !iter.Next() {
+	for datum := range as.snapshot.Select(Claim{E: e, A: a}) {
+		switch x := datum.V.(type) {
+		case String:
+			v = string(x)
+		case Int:
+			v = int64(x)
+		case Bool:
+			v = bool(x)
+		case Float:
+			v = float64(x)
+		case Inst:
+			v = time.Time(x)
+		case ID:
+			v = uint64(x)
+		default:
+			panic("assembler.invalidFactValue")
+		}
 		return
-	}
-	switch x := iter.Value().V.(type) {
-	case String:
-		v = string(x)
-	case Int:
-		v = int64(x)
-	case Bool:
-		v = bool(x)
-	case Float:
-		v = float64(x)
-	case Inst:
-		v = time.Time(x)
-	case ID:
-		v = uint64(x)
-	default:
-		panic("assembler.invalidFactValue")
 	}
 	return
 }

@@ -1,6 +1,7 @@
 package index
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/dball/destructive/internal/sys"
@@ -37,9 +38,9 @@ func TestIndex(t *testing.T) {
 	assert.True(t, idx.Find(d1))
 	assert.True(t, idx.Find(d2))
 
-	assert.Equal(t, []Datum{d2, d1}, idx.Select(EA, Datum{E: e, A: a}).Drain())
-	assert.Equal(t, []Datum{}, idx.Select(EA, Datum{E: e - 1, A: a}).Drain())
-	assert.Equal(t, []Datum{}, idx.Select(EA, Datum{E: e + 1, A: a}).Drain())
+	assert.Equal(t, []Datum{d2, d1}, slices.Collect(idx.Select(EA, Datum{E: e, A: a})))
+	assert.Empty(t, slices.Collect(idx.Select(EA, Datum{E: e - 1, A: a})))
+	assert.Empty(t, slices.Collect(idx.Select(EA, Datum{E: e + 1, A: a})))
 
 	assert.True(t, idx.Delete(d1))
 	assert.False(t, idx.Find(d1))
@@ -63,7 +64,7 @@ func TestIndexTimeProperties(t *testing.T) {
 
 	assert.False(t, idx.Insert(d1))
 
-	assert.Equal(t, []Datum{d1}, idx.Select(E, d2).Drain())
+	assert.Equal(t, []Datum{d1}, slices.Collect(idx.Select(E, d2)))
 	assert.True(t, idx.Find(d2))
 	assert.True(t, idx.Delete(d2))
 	assert.False(t, idx.Delete(d2))
@@ -103,7 +104,7 @@ func TestIndexSelection(t *testing.T) {
 			{E: es[0], A: a1, V: Int(3), T: tx},
 			{E: es[0], A: a1, V: Int(4), T: tx},
 		}
-		assert.Equal(t, expected, idx.Select(EA, Datum{E: es[0], A: a1}).Drain())
+		assert.Equal(t, expected, slices.Collect(idx.Select(EA, Datum{E: es[0], A: a1})))
 		datum, ok := idx.First(EA, Datum{E: es[0], A: a1})
 		assert.True(t, ok)
 		assert.Equal(t, expected[0], datum)
@@ -127,7 +128,7 @@ func TestIndexSelection(t *testing.T) {
 			{E: es[1], A: a3, V: Int(4), T: tx},
 			{E: es[1], A: a3, V: Int(5), T: tx},
 		}
-		assert.Equal(t, expected, idx.Select(E, Datum{E: es[1]}).Drain())
+		assert.Equal(t, expected, slices.Collect(idx.Select(E, Datum{E: es[1]})))
 		datum, ok := idx.First(E, Datum{E: es[1]})
 		assert.True(t, ok)
 		assert.Equal(t, expected[0], datum)
@@ -141,7 +142,7 @@ func TestIndexSelection(t *testing.T) {
 			{E: es[2], A: a3, V: Int(4), T: tx},
 			{E: es[2], A: a3, V: Int(5), T: tx},
 		}
-		assert.Equal(t, expected, idx.Select(AE, Datum{E: es[2], A: a3}).Drain())
+		assert.Equal(t, expected, slices.Collect(idx.Select(AE, Datum{E: es[2], A: a3})))
 		datum, ok := idx.First(AE, Datum{E: es[2], A: a3})
 		assert.True(t, ok)
 		assert.Equal(t, expected[0], datum)
@@ -150,8 +151,7 @@ func TestIndexSelection(t *testing.T) {
 	// TODO this is unsatisfiable by the eav index. Currently, we return an empty
 	// iterator, but that's as accidental as anything. What should we return?
 	t.Run("a", func(t *testing.T) {
-		expected := []Datum{}
-		assert.Equal(t, expected, idx.Select(A, Datum{A: a2}).Drain())
+		assert.Empty(t, slices.Collect(idx.Select(A, Datum{A: a2})))
 	})
 }
 

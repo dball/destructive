@@ -143,9 +143,7 @@ func (db *indexDatabase) Write(req Request) (res Response) {
 			ids[id] = Void{}
 		}
 		for id := range ids {
-			iter := db.eav.Select(index.E, Datum{E: id})
-			for iter.Next() {
-				datum := iter.Value()
+			for datum := range db.eav.Select(index.E, Datum{E: id}) {
 				// We could go straight to the indexes with the datums instead of allocating them anew as claims
 				// but we will need to handle invariant enforcement and cache maintenance differently.
 				claims = append(claims, Claim{E: datum.E, A: datum.A, V: datum.V.(VRef), Retract: true})

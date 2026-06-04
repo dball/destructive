@@ -1,6 +1,7 @@
 package database
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -151,7 +152,7 @@ func TestSelect(t *testing.T) {
 	tx := res.ID
 	id := res.TempIDs[TempID("1")]
 	view := res.Snapshot
-	data := view.Select(Claim{E: id}).Drain()
+	data := slices.Collect(view.Select(Claim{E: id}))
 	assert.Equal(t, []Datum{
 		{E: id, A: view.ResolveIdent(Ident("person/name")), V: String("Donald"), T: tx},
 		{E: id, A: view.ResolveIdent(Ident("person/age")), V: Int(49), T: tx},
@@ -201,7 +202,7 @@ func TestBool(t *testing.T) {
 	id := res.TempIDs[TempID("1")]
 	view := res.Snapshot
 	tx := res.ID
-	data := view.Select(Claim{E: id, A: Ident("person/likes-pickles")}).Drain()
+	data := slices.Collect(view.Select(Claim{E: id, A: Ident("person/likes-pickles")}))
 	assert.Equal(t, []Datum{
 		{E: id, A: view.ResolveIdent(Ident("person/likes-pickles")), V: Bool(true), T: tx},
 	}, data)
@@ -223,7 +224,7 @@ func TestInst(t *testing.T) {
 	id := res.TempIDs[TempID("1")]
 	view := res.Snapshot
 	tx := res.ID
-	data := view.Select(Claim{E: id, A: Ident("person/born")}).Drain()
+	data := slices.Collect(view.Select(Claim{E: id, A: Ident("person/born")}))
 	assert.Equal(t, []Datum{
 		{E: id, A: view.ResolveIdent(Ident("person/born")), V: Inst(born), T: tx},
 	}, data)
@@ -244,7 +245,7 @@ func TestInt(t *testing.T) {
 	id := res.TempIDs[TempID("1")]
 	view := res.Snapshot
 	tx := res.ID
-	data := view.Select(Claim{E: id, A: Ident("person/age")}).Drain()
+	data := slices.Collect(view.Select(Claim{E: id, A: Ident("person/age")}))
 
 	assert.Equal(t, []Datum{
 		{E: id, A: view.ResolveIdent(Ident("person/age")), V: Int(-49), T: tx},
