@@ -3,6 +3,7 @@ package database
 
 import (
 	"log"
+	"maps"
 	"sync"
 
 	"github.com/dball/destructive/internal/index"
@@ -49,9 +50,7 @@ func NewIndexDatabase(degree int, attrsSize int, identsSize int) (db Database) {
 			attrCardManies[id] = Void{}
 		}
 	}
-	for ident, id := range sys.Idents {
-		idents[ident] = id
-	}
+	maps.Copy(idents, sys.Idents)
 	eav := index.NewCompositeIndex(degree, index.EAVIndex, attrTypes)
 	aev := index.NewCompositeIndex(degree, index.AEVIndex, attrTypes)
 	ave := index.NewCompositeIndex(degree, index.AVEIndex, attrTypes)
@@ -94,14 +93,8 @@ func (db *indexDatabase) Read() (snapshot Snapshot) {
 }
 
 func (db *indexDatabase) read() (snapshot Snapshot) {
-	idents := make(map[Ident]ID, len(db.idents))
-	for ident, id := range db.idents {
-		idents[ident] = id
-	}
-	attrs := make(map[ID]Attr, len(db.attrsByID))
-	for id, attr := range db.attrsByID {
-		attrs[id] = attr
-	}
+	idents := maps.Clone(db.idents)
+	attrs := maps.Clone(db.attrsByID)
 	snapshot = &indexSnapshot{
 		eav: db.eav.Clone(),
 		aev: db.aev.Clone(),

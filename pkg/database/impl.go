@@ -98,7 +98,7 @@ func (db *localDatabase) Write(req Request) (res Response) {
 	}
 	n := len(req.Assertions)
 	res.IDs = make([]uint64, 0, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		switch id := ids[i].(type) {
 		case types.ID:
 			res.IDs = append(res.IDs, uint64(id))

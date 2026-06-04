@@ -105,7 +105,7 @@ func Analyze(typ reflect.Type) (model StructModel, err error) {
 	model.Type = typ
 	n := typ.NumField()
 	attrFields := make([]AttrFieldModel, 0, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		fieldType := typ.Field(i)
 		attr, fieldErr := parseAttrField(fieldType)
 		if fieldErr != nil {

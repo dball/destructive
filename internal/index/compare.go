@@ -1,10 +1,10 @@
 package index
 
-import "golang.org/x/exp/constraints"
+import "cmp"
 
-type Lesser[X constraints.Ordered] func(d1 TypedDatum[X], d2 TypedDatum[X]) bool
+type Lesser[X cmp.Ordered] func(d1 TypedDatum[X], d2 TypedDatum[X]) bool
 
-func LessEAV[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (less bool) {
+func LessEAV[X cmp.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (less bool) {
 	switch {
 	case d1.E < d2.E:
 		less = true
@@ -20,7 +20,7 @@ func LessEAV[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (less bo
 	return
 }
 
-func LessAVE[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (less bool) {
+func LessAVE[X cmp.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (less bool) {
 	switch {
 	case d1.A < d2.A:
 		less = true
@@ -36,7 +36,7 @@ func LessAVE[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (less bo
 	return
 }
 
-func LessAEV[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (less bool) {
+func LessAEV[X cmp.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (less bool) {
 	switch {
 	case d1.A < d2.A:
 		less = true
@@ -52,7 +52,7 @@ func LessAEV[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (less bo
 	return
 }
 
-func LessVAE[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (less bool) {
+func LessVAE[X cmp.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (less bool) {
 	switch {
 	case d1.V < d2.V:
 		less = true
@@ -68,9 +68,9 @@ func LessVAE[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (less bo
 	return
 }
 
-type Comparer[X constraints.Ordered] func(d1 TypedDatum[X], d2 TypedDatum[X]) int
+type Comparer[X cmp.Ordered] func(d1 TypedDatum[X], d2 TypedDatum[X]) int
 
-func CompareE[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
+func CompareE[X cmp.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
 	switch {
 	case d1.E < d2.E:
 		diff = -1
@@ -82,7 +82,7 @@ func CompareE[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff i
 	return
 }
 
-func CompareEA[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
+func CompareEA[X cmp.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
 	diff = CompareE(d1, d2)
 	if diff == 0 {
 		diff = CompareA(d1, d2)
@@ -90,7 +90,7 @@ func CompareEA[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff 
 	return
 }
 
-func CompareEAV[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
+func CompareEAV[X cmp.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
 	diff = CompareEA(d1, d2)
 	if diff == 0 {
 		diff = CompareV(d1, d2)
@@ -98,7 +98,7 @@ func CompareEAV[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff
 	return
 }
 
-func CompareA[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
+func CompareA[X cmp.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
 	switch {
 	case d1.A < d2.A:
 		diff = -1
@@ -110,7 +110,7 @@ func CompareA[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff i
 	return
 }
 
-func CompareAE[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
+func CompareAE[X cmp.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
 	diff = CompareA(d1, d2)
 	if diff == 0 {
 		diff = CompareE(d1, d2)
@@ -118,7 +118,7 @@ func CompareAE[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff 
 	return
 }
 
-func CompareAEV[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
+func CompareAEV[X cmp.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
 	diff = CompareAE(d1, d2)
 	if diff == 0 {
 		diff = CompareV(d1, d2)
@@ -126,7 +126,7 @@ func CompareAEV[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff
 	return
 }
 
-func CompareAV[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
+func CompareAV[X cmp.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
 	diff = CompareA(d1, d2)
 	if diff == 0 {
 		diff = CompareV(d1, d2)
@@ -134,7 +134,7 @@ func CompareAV[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff 
 	return
 }
 
-func CompareAVE[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
+func CompareAVE[X cmp.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
 	diff = CompareAV(d1, d2)
 	if diff == 0 {
 		diff = CompareE(d1, d2)
@@ -142,7 +142,7 @@ func CompareAVE[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff
 	return
 }
 
-func CompareV[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
+func CompareV[X cmp.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
 	switch {
 	case d1.V < d2.V:
 		diff = -1
@@ -154,7 +154,7 @@ func CompareV[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff i
 	return
 }
 
-func CompareVA[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
+func CompareVA[X cmp.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
 	diff = CompareV(d1, d2)
 	if diff == 0 {
 		diff = CompareA(d1, d2)
@@ -162,7 +162,7 @@ func CompareVA[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff 
 	return
 }
 
-func CompareVAE[X constraints.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
+func CompareVAE[X cmp.Ordered](d1 TypedDatum[X], d2 TypedDatum[X]) (diff int) {
 	diff = CompareVA(d1, d2)
 	if diff == 0 {
 		diff = CompareE(d1, d2)

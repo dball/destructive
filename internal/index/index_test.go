@@ -83,11 +83,11 @@ func TestIndexSelection(t *testing.T) {
 	tx := allocate()
 	n := 3
 	var es []ID
-	for i := 0; i < n; i++ {
+	for range n {
 		e := allocate()
 		es = append(es, e)
 		m := 5
-		for j := 0; j < 5; j++ {
+		for j := range 5 {
 			idx.Insert(Datum{E: e, A: a1, V: Int(j), T: tx})
 			idx.Insert(Datum{E: e, A: a2, V: Int(j + 1), T: tx})
 			// We insert in reverse order, and the index will sort on select

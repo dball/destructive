@@ -42,7 +42,7 @@ func getFieldValue(pointers map[reflect.Value]TempID, fieldType reflect.Type, fi
 	case reflect.Slice:
 		var vals values
 		n := fieldValue.Len()
-		for i := 0; i < n; i++ {
+		for i := range n {
 			vals = append(vals, fieldValue.Index(i).Interface())
 		}
 		val = vals

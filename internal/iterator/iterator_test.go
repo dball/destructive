@@ -22,7 +22,7 @@ func TestSliceIterator(t *testing.T) {
 func TestRangeAll(t *testing.T) {
 	x := []int64{}
 	r := RangeAll()
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		assert.True(t, r.Next())
 		x = append(x, r.Value())
 	}
