@@ -124,8 +124,8 @@ type Snapshot interface {
 	Select(claim Claim) iter.Seq[Datum]
 	// Count returns the number of datums matching the claim.
 	Count(claim Claim) (count int)
-	// Find returns the datum matching the claim, if any.
-	Find(claim Claim) (match Datum, found bool)
+	// Has reports whether any datum matches the claim.
+	Has(claim Claim) (found bool)
 	// ResolveIdent resolves an ident to an id.
 	ResolveIdent(ident Ident) (id ID)
 	// ResolveAttrIdent resolves an attribute id to an ident.

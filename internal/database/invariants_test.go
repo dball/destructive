@@ -171,7 +171,7 @@ func TestLookupRefResolution(t *testing.T) {
 		{E: LookupRef{A: Ident("person/name"), V: String("Grace")}, A: Ident("person/age"), V: Int(85)},
 	}})
 	assert.NoError(t, res.Error)
-	_, ok := res.Snapshot.Find(Claim{E: id, A: Ident("person/age"), V: Int(85)})
+	ok := res.Snapshot.Has(Claim{E: id, A: Ident("person/age"), V: Int(85)})
 	assert.True(t, ok)
 
 	// A lookup ref that matches nothing is an invalid entity reference.
@@ -195,9 +195,9 @@ func TestCardinalityOneReplaces(t *testing.T) {
 
 	view := res.Snapshot
 	assert.Equal(t, 1, view.Count(Claim{E: id, A: Ident("person/age")}), "cardinality-one keeps a single value")
-	_, ok := view.Find(Claim{E: id, A: Ident("person/age"), V: Int(41)})
+	ok := view.Has(Claim{E: id, A: Ident("person/age"), V: Int(41)})
 	assert.True(t, ok)
-	_, ok = view.Find(Claim{E: id, A: Ident("person/age"), V: Int(40)})
+	ok = view.Has(Claim{E: id, A: Ident("person/age"), V: Int(40)})
 	assert.False(t, ok, "old value replaced")
 }
 
@@ -228,9 +228,9 @@ func TestRetractMultiple(t *testing.T) {
 		{Constraints: map[IDRef]Void{LookupRef{A: Ident("person/name"), V: String("Bo")}: {}}},
 	}})
 	assert.NoError(t, res.Error)
-	_, ok := res.Snapshot.Find(Claim{E: LookupRef{A: Ident("person/name"), V: String("Ann")}, A: Ident("person/name"), V: String("Ann")})
+	ok := res.Snapshot.Has(Claim{E: LookupRef{A: Ident("person/name"), V: String("Ann")}, A: Ident("person/name"), V: String("Ann")})
 	assert.False(t, ok)
-	_, ok = res.Snapshot.Find(Claim{E: LookupRef{A: Ident("person/name"), V: String("Bo")}, A: Ident("person/name"), V: String("Bo")})
+	ok = res.Snapshot.Has(Claim{E: LookupRef{A: Ident("person/name"), V: String("Bo")}, A: Ident("person/name"), V: String("Bo")})
 	assert.False(t, ok)
 }
 
@@ -260,7 +260,7 @@ func TestRetractDoesNotCascadeToReferences(t *testing.T) {
 	}})
 	assert.NoError(t, res.Error)
 	// Bob, whom Alice referenced through a plain ref, is correctly untouched.
-	_, ok := res.Snapshot.Find(Claim{E: bob, A: Ident("person/name"), V: String("Bob")})
+	ok := res.Snapshot.Has(Claim{E: bob, A: Ident("person/name"), V: String("Bob")})
 	assert.True(t, ok, "referenced entity survives retraction of the referrer")
 }
 
@@ -280,11 +280,11 @@ func TestSnapshotIsolation(t *testing.T) {
 	assert.NoError(t, res.Error)
 	after := res.Snapshot
 
-	_, ok := before.Find(Claim{E: id, A: Ident("person/age"), V: Int(30)})
+	ok := before.Has(Claim{E: id, A: Ident("person/age"), V: Int(30)})
 	assert.True(t, ok, "old snapshot still sees old value")
-	_, ok = before.Find(Claim{E: id, A: Ident("person/age"), V: Int(31)})
+	ok = before.Has(Claim{E: id, A: Ident("person/age"), V: Int(31)})
 	assert.False(t, ok, "old snapshot does not see the later write")
-	_, ok = after.Find(Claim{E: id, A: Ident("person/age"), V: Int(31)})
+	ok = after.Has(Claim{E: id, A: Ident("person/age"), V: Int(31)})
 	assert.True(t, ok, "new snapshot sees new value")
 }
 
@@ -302,7 +302,7 @@ func TestWriteErrorLeavesDatabaseIntact(t *testing.T) {
 	assert.Nil(t, bad.TempIDs)
 
 	// The earlier datum is still present and further writes still succeed.
-	_, ok := db.Read().Find(Claim{E: id, A: Ident("person/age"), V: Int(20)})
+	ok := db.Read().Has(Claim{E: id, A: Ident("person/age"), V: Int(20)})
 	assert.True(t, ok)
 	ok2 := db.Write(Request{Claims: []Claim{{E: TempID("q"), A: Ident("person/name"), V: String("Quinn")}}})
 	assert.NoError(t, ok2.Error)

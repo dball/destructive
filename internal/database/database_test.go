@@ -26,21 +26,18 @@ func TestWriteSimple(t *testing.T) {
 	e = res.TempIDs[TempID("1")]
 	tx = res.ID
 
-	match, ok := res.Snapshot.Find(Claim{E: e, A: sys.DbIdent, V: String("test/ident")})
+	ok := res.Snapshot.Has(Claim{E: e, A: sys.DbIdent, V: String("test/ident")})
 	assert.True(t, ok)
-	assert.Equal(t, Datum{E: e, A: sys.DbIdent, V: String("test/ident")}, match)
 	snapshot := db.Read()
-	match, ok = snapshot.Find(Claim{E: e, A: sys.DbIdent, V: String("test/ident")})
+	ok = snapshot.Has(Claim{E: e, A: sys.DbIdent, V: String("test/ident")})
 	assert.True(t, ok)
-	assert.Equal(t, Datum{E: e, A: sys.DbIdent, V: String("test/ident")}, match)
 
 	res = db.Write(req)
 	assert.NoError(t, res.Error)
 	assert.Equal(t, e, res.TempIDs[TempID("1")])
 	assert.NotEqual(t, tx, res.ID)
-	match, ok = res.Snapshot.Find(Claim{E: e, A: sys.DbIdent, V: String("test/ident")})
+	ok = res.Snapshot.Has(Claim{E: e, A: sys.DbIdent, V: String("test/ident")})
 	assert.True(t, ok)
-	assert.Equal(t, Datum{E: e, A: sys.DbIdent, V: String("test/ident")}, match)
 }
 
 func TestWriteAttr(t *testing.T) {
@@ -113,7 +110,7 @@ func TestIdentityUnique(t *testing.T) {
 	assert.NoError(t, res.Error)
 	id := res.TempIDs[TempID("1")]
 	assert.Positive(t, id)
-	_, ok := res.Snapshot.Find(Claim{E: id, A: Ident("person/age"), V: Int(49)})
+	ok := res.Snapshot.Has(Claim{E: id, A: Ident("person/age"), V: Int(49)})
 	assert.True(t, ok)
 
 	req = Request{
@@ -125,11 +122,11 @@ func TestIdentityUnique(t *testing.T) {
 	res = db.Write(req)
 	assert.NoError(t, res.Error)
 	assert.Equal(t, id, res.TempIDs[TempID("1")])
-	_, ok = res.Snapshot.Find(Claim{E: id, A: Ident("person/age"), V: Int(50)})
+	ok = res.Snapshot.Has(Claim{E: id, A: Ident("person/age"), V: Int(50)})
 	assert.True(t, ok)
-	_, ok = res.Snapshot.Find(Claim{E: id, A: Ident("person/score"), V: Float(23.42)})
+	ok = res.Snapshot.Has(Claim{E: id, A: Ident("person/score"), V: Float(23.42)})
 	assert.True(t, ok)
-	_, ok = res.Snapshot.Find(Claim{E: LookupRef{A: Ident("person/name"), V: String("Donald")}, A: Ident("person/age"), V: Int(50)})
+	ok = res.Snapshot.Has(Claim{E: LookupRef{A: Ident("person/name"), V: String("Donald")}, A: Ident("person/age"), V: Int(50)})
 	assert.True(t, ok)
 }
 
@@ -183,7 +180,7 @@ func TestRetract(t *testing.T) {
 	}
 	res = db.Write(req)
 	assert.NoError(t, res.Error)
-	_, ok := res.Snapshot.Find(Claim{E: LookupRef{A: Ident("person/name"), V: String("Donald")}, A: Ident("person/age"), V: Int(49)})
+	ok := res.Snapshot.Has(Claim{E: LookupRef{A: Ident("person/name"), V: String("Donald")}, A: Ident("person/age"), V: Int(49)})
 	assert.False(t, ok)
 }
 
