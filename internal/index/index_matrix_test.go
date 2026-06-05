@@ -133,12 +133,9 @@ func TestVAEInsertFindDelete(t *testing.T) {
 	assert.False(t, idx.Delete(d))
 }
 
-// TestFirstNegativeInt EXPOSES A BUG. First on an int- or inst-typed attribute
-// must return the true minimum value, but it starts its scan from the zero value
-// instead of math.MinInt64 (compare index.go First's int/inst cases against
-// Select's `V: math.MinInt64`), so it skips negative values and wrongly returns 4.
-// This test asserts the correct result (-5) and therefore fails until the start
-// bound is fixed.
+// TestFirstNegativeInt covers a fixed bug: First on an int- or inst-typed attribute
+// used to start its scan from the zero value instead of math.MinInt64, skipping
+// negative values. First(EA) now returns the true minimum, -5.
 func TestFirstNegativeInt(t *testing.T) {
 	allocate := newAllocator()
 	a := allocate()
@@ -159,11 +156,35 @@ func TestFirstNegativeInt(t *testing.T) {
 	assert.Equal(t, Datum{E: e, A: a, V: Int(-5), T: tx}, first)
 }
 
-// TestSelectEGlobalOrdering EXPOSES A BUG. Select(E) should return an entity's
-// datums in global attribute order, but it concatenates the typed sub-sequences, so
-// results come back grouped by storage type (see the TODO at index.go, "our
-// sequences could maintain eav sorting"). This test asserts the correct global
-// ordering and therefore fails until the sub-sequences are merged.
+// TestAllDatums asserts All() yields every datum across the typed sub-trees in
+// global eav order (by entity, then attribute), recovering bool and inst values.
+func TestAllDatums(t *testing.T) {
+	allocate := newAllocator()
+	aName := allocate() // string
+	aAge := allocate()  // int
+	aOk := allocate()   // bool (uint tree)
+	idx := NewCompositeIndex(32, EAVIndex, map[ID]ID{
+		aName: sys.AttrTypeString,
+		aAge:  sys.AttrTypeInt,
+		aOk:   sys.AttrTypeBool,
+	})
+	tx := allocate()
+	e1 := allocate()
+	e2 := allocate()
+	d1Name := Datum{E: e1, A: aName, V: String("e1"), T: tx}
+	d1Ok := Datum{E: e1, A: aOk, V: Bool(true), T: tx}
+	d2Age := Datum{E: e2, A: aAge, V: Int(2), T: tx}
+	for _, d := range []Datum{d2Age, d1Ok, d1Name} {
+		idx.Insert(d)
+	}
+
+	expected := []Datum{d1Name, d1Ok, d2Age} // e1 (aName<aOk) then e2
+	assert.Equal(t, expected, slices.Collect(idx.All()))
+}
+
+// TestSelectEGlobalOrdering asserts that Select(E) returns an entity's datums in
+// global attribute order, merged across the typed sub-trees, rather than grouped by
+// storage type.
 func TestSelectEGlobalOrdering(t *testing.T) {
 	allocate := newAllocator()
 	aStr := allocate()   // string tree

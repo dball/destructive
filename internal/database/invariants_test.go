@@ -234,10 +234,13 @@ func TestRetractMultiple(t *testing.T) {
 	assert.False(t, ok)
 }
 
-// TestRetractIsNotRecursive documents that retracting an entity removes only its
-// own datums, not those of entities it references. The model description says
-// retraction is recursive; the implementation is not. (Tracked as a known gap.)
-func TestRetractIsNotRecursive(t *testing.T) {
+// TestRetractDoesNotCascadeToReferences confirms that retracting an entity removes
+// only its own datums, leaving entities it references through ordinary reference
+// attributes untouched. This is correct: friendship is a plain ref, not a dependent
+// ref. The Retraction doc's "recursively" applies only to dependent references
+// (sys/attr/ref/type/dependent), which are not yet implemented; see the planned
+// extensions note in doc/architecture.md.
+func TestRetractDoesNotCascadeToReferences(t *testing.T) {
 	db := NewIndexDatabase(32, 64, 64)
 	assert.NoError(t, Declare(db,
 		Attr{Ident: "person/name", Type: sys.AttrTypeString, Unique: sys.AttrUniqueIdentity},
@@ -256,7 +259,7 @@ func TestRetractIsNotRecursive(t *testing.T) {
 		{Constraints: map[IDRef]Void{LookupRef{A: Ident("person/name"), V: String("Alice")}: {}}},
 	}})
 	assert.NoError(t, res.Error)
-	// Bob, who Alice referenced, is untouched.
+	// Bob, whom Alice referenced through a plain ref, is correctly untouched.
 	_, ok := res.Snapshot.Find(Claim{E: bob, A: Ident("person/name"), V: String("Bob")})
 	assert.True(t, ok, "referenced entity survives retraction of the referrer")
 }
@@ -306,10 +309,9 @@ func TestWriteErrorLeavesDatabaseIntact(t *testing.T) {
 }
 
 // TestSnapshotQueryRouting locks down the snapshot query surface across every shape
-// of claim. The "filtered shapes" and "all datums" subtests EXPOSE BUGS: those claim
-// shapes currently panic with TODO markers instead of returning results. The
-// assert.NotPanics guards turn those panics into clean failures (a raw panic would
-// abort the test binary) and pass once the shapes are implemented.
+// of claim. The "filtered shapes" and "all datums" subtests cover shapes that once
+// panicked with TODO markers instead of returning results; the assert.NotPanics
+// guards remain as regression guards against any shape panicking again.
 func TestSnapshotQueryRouting(t *testing.T) {
 	db := newPersonDB(t)
 	res := db.Write(Request{Claims: []Claim{

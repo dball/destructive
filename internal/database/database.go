@@ -497,6 +497,9 @@ func (db *indexDatabase) resolveLookupRef(ref LookupRef) (id ID) {
 	default:
 		return
 	}
+	if db.attrUniques[datum.A] == 0 {
+		return
+	}
 	match, ok := db.ave.First(index.AV, datum)
 	if ok {
 		id = match.E

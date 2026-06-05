@@ -6,7 +6,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/dball/destructive/internal/iterator"
 	"github.com/dball/destructive/internal/sys"
 	. "github.com/dball/destructive/internal/types"
 )
@@ -76,6 +75,8 @@ type Index interface {
 	// Select returns a sequence of datums that match the given datum according to the partial
 	// index.
 	Select(p PartialIndex, datum Datum) iter.Seq[Datum]
+	// All returns every datum in the index in global eav order.
+	All() iter.Seq[Datum]
 	// First returns the first datum matching the partial index, if any.
 	First(p PartialIndex, datum Datum) (match Datum, extant bool)
 	// Count returns the number of datums matching the partial index.
@@ -257,17 +258,19 @@ func mapSeq(seq iter.Seq[Datum], f func(Datum) Datum) iter.Seq[Datum] {
 	}
 }
 
+// The partial index passed to Select/First/Count must be one this index can
+// satisfy for the datum's attribute type; the database is responsible for pairing
+// the right index with the right partial. An unsupported pairing yields an empty
+// result rather than an error.
 func (idx *CompositeIndex) Select(p PartialIndex, datum Datum) (seq iter.Seq[Datum]) {
-	// TODO should idx ensure p is legit for its type? This would just be a cross check against the
-	// database misusing its indexes.
 	if p == E {
 		strings := idx.strings.Select(CompareE[string], stringValuer.valuer, TypedDatum[string]{E: datum.E})
 		ints := idx.ints.Select(CompareE[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E})
 		uints := idx.uints.Select(CompareE[uint64], refValuer.valuer, TypedDatum[uint64]{E: datum.E})
 		floats := idx.floats.Select(CompareE[float64], floatValuer.valuer, TypedDatum[float64]{E: datum.E})
-		// Concatenate the typed sub-sequences, mapping the int and uint datums through
-		// the transforms that recover inst and bool values from their stored representation.
-		seq = iterator.Concat(strings, mapSeq(ints, idx.reint), mapSeq(uints, idx.reuint), floats)
+		// Merge the typed sub-sequences into global eav order, mapping the int and uint
+		// datums through the transforms that recover inst and bool values from storage.
+		seq = mergeEAV(strings, mapSeq(ints, idx.reint), mapSeq(uints, idx.reuint), floats)
 		return
 	}
 	switch idx.attrTypes[datum.A] {
@@ -342,23 +345,13 @@ func (idx *CompositeIndex) Select(p PartialIndex, datum Datum) (seq iter.Seq[Dat
 }
 
 func (idx *CompositeIndex) First(p PartialIndex, datum Datum) (match Datum, extant bool) {
-	// TODO should idx ensure p is legit for its type? This would just be a cross check against the
-	// database misusing its indexes.
+	// See the contract note on Select regarding partial/index pairing.
 	if p == E {
-		// TODO a order is quite important here, right, even though we're never going to need this case
-		match, extant = idx.strings.First(CompareE[string], stringValuer.valuer, TypedDatum[string]{E: datum.E})
-		if extant {
-			return
+		// Drawing from the eav-ordered Select yields the lowest-attribute datum for the
+		// entity, correctly typed, regardless of which sub-tree stores it.
+		for d := range idx.Select(E, datum) {
+			return d, true
 		}
-		match, extant = idx.ints.First(CompareE[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E})
-		if extant {
-			return
-		}
-		match, extant = idx.uints.First(CompareE[uint64], refValuer.valuer, TypedDatum[uint64]{E: datum.E})
-		if extant {
-			return
-		}
-		match, extant = idx.floats.First(CompareE[float64], floatValuer.valuer, TypedDatum[float64]{E: datum.E})
 		return
 	}
 	switch idx.attrTypes[datum.A] {
@@ -376,11 +369,11 @@ func (idx *CompositeIndex) First(p PartialIndex, datum Datum) (match Datum, exta
 	case sys.AttrTypeInt:
 		switch p {
 		case EA:
-			match, extant = idx.ints.First(CompareEA[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A})
+			match, extant = idx.ints.First(CompareEA[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
 		case AE:
-			match, extant = idx.ints.First(CompareAE[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A})
+			match, extant = idx.ints.First(CompareAE[int64], intValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
 		case A:
-			match, extant = idx.ints.First(CompareA[int64], intValuer.valuer, TypedDatum[int64]{A: datum.A})
+			match, extant = idx.ints.First(CompareA[int64], intValuer.valuer, TypedDatum[int64]{A: datum.A, V: math.MinInt64})
 		case AV:
 			match, extant = idx.ints.First(CompareAV[int64], intValuer.valuer, TypedDatum[int64]{A: datum.A, V: intValuer.devaluer(datum.V)})
 		}
@@ -420,11 +413,11 @@ func (idx *CompositeIndex) First(p PartialIndex, datum Datum) (match Datum, exta
 	case sys.AttrTypeInst:
 		switch p {
 		case EA:
-			match, extant = idx.ints.First(CompareEA[int64], instValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A})
+			match, extant = idx.ints.First(CompareEA[int64], instValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
 		case AE:
-			match, extant = idx.ints.First(CompareAE[int64], instValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A})
+			match, extant = idx.ints.First(CompareAE[int64], instValuer.valuer, TypedDatum[int64]{E: datum.E, A: datum.A, V: math.MinInt64})
 		case A:
-			match, extant = idx.ints.First(CompareA[int64], instValuer.valuer, TypedDatum[int64]{A: datum.A})
+			match, extant = idx.ints.First(CompareA[int64], instValuer.valuer, TypedDatum[int64]{A: datum.A, V: math.MinInt64})
 		case AV:
 			match, extant = idx.ints.First(CompareAV[int64], instValuer.valuer, TypedDatum[int64]{A: datum.A, V: instValuer.devaluer(datum.V)})
 		}
@@ -433,8 +426,7 @@ func (idx *CompositeIndex) First(p PartialIndex, datum Datum) (match Datum, exta
 }
 
 func (idx *CompositeIndex) Count(p PartialIndex, datum Datum) (count int) {
-	// TODO should idx ensure p is legit for its type? This would just be a cross check against the
-	// database misusing its indexes.
+	// See the contract note on Select regarding partial/index pairing.
 	if p == E {
 		count += idx.strings.Count(CompareE[string], TypedDatum[string]{E: datum.E})
 		count += idx.ints.Count(CompareE[int64], TypedDatum[int64]{E: datum.E})
