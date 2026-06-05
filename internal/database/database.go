@@ -432,7 +432,9 @@ func (db *indexDatabase) evaluateClaim(res *Response, claim *Claim) (datum *Datu
 	case TempID:
 		id := res.TempIDs[v]
 		if id == 0 {
-			// TODO is it okay if there are no claim e's that correspond to this?
+			// If there are no claim e's that correspond to this, we're asserting
+			// a tempid e.g. for a reference attr value. That's weird but not
+			// obviously wrong.
 			id = db.allocateID()
 			res.TempIDs[v] = id
 		}
@@ -445,8 +447,6 @@ func (db *indexDatabase) evaluateClaim(res *Response, claim *Claim) (datum *Datu
 		datum.V = id
 	default:
 		ok := false
-		// TODO we could make ourselves a typed datum right here if we want to commit to that
-		// instead of the composite index abstraction, avoiding an intermediate struct thereby.
 		datum.V, ok = v.(Value)
 		if !ok {
 			res.Error = NewError("database.write.invalidV", "v", v)
