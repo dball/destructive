@@ -17,6 +17,19 @@ func TestConcatEmpty(t *testing.T) {
 	assert.Empty(t, slices.Collect(Concat[int]()))
 }
 
+func TestConcatMixedEmpty(t *testing.T) {
+	// Empty sub-sequences interspersed with non-empty ones contribute nothing
+	// but must not interrupt the flow of the others.
+	seq := Concat(
+		slices.Values([]int{}),
+		slices.Values([]int{1, 2}),
+		slices.Values([]int{}),
+		slices.Values([]int{3}),
+		slices.Values([]int{}),
+	)
+	assert.Equal(t, []int{1, 2, 3}, slices.Collect(seq))
+}
+
 func TestConcatEarlyTermination(t *testing.T) {
 	// touched records how many values each sub-sequence yielded, so we can prove the
 	// composite does no work past the point the consumer stops.
