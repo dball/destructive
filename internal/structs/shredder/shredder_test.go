@@ -246,6 +246,48 @@ func TestScalarSliceFields(t *testing.T) {
 	})
 }
 
+func TestIntScalarSliceField(t *testing.T) {
+	type Test struct {
+		Ages []int `attr:"test/ages,value=test/age"`
+	}
+	shredder := NewShredder(models.BuildCachingAnalyzer())
+	actual, _, err := shredder.Shred(Document{Assertions: []any{Test{Ages: []int{7, 11}}}})
+	assert.NoError(t, err)
+	expected := Request{
+		Claims: []Claim{
+			{E: TempID("1"), A: Ident("test/ages"), V: TempID("2")},
+			{E: TempID("1"), A: Ident("test/ages"), V: TempID("3")},
+			{E: TempID("2"), A: Ident("sys/db/rank"), V: Int(0)},
+			{E: TempID("2"), A: Ident("test/age"), V: Int(7)},
+			{E: TempID("3"), A: Ident("sys/db/rank"), V: Int(1)},
+			{E: TempID("3"), A: Ident("test/age"), V: Int(11)},
+		},
+		Retractions: []Retraction{},
+	}
+	assert.Equal(t, expected, actual)
+}
+
+func TestBoolScalarSliceField(t *testing.T) {
+	type Test struct {
+		Flags []bool `attr:"test/flags,value=test/flag"`
+	}
+	shredder := NewShredder(models.BuildCachingAnalyzer())
+	actual, _, err := shredder.Shred(Document{Assertions: []any{Test{Flags: []bool{true, false}}}})
+	assert.NoError(t, err)
+	expected := Request{
+		Claims: []Claim{
+			{E: TempID("1"), A: Ident("test/flags"), V: TempID("2")},
+			{E: TempID("1"), A: Ident("test/flags"), V: TempID("3")},
+			{E: TempID("2"), A: Ident("sys/db/rank"), V: Int(0)},
+			{E: TempID("2"), A: Ident("test/flag"), V: Bool(true)},
+			{E: TempID("3"), A: Ident("sys/db/rank"), V: Int(1)},
+			{E: TempID("3"), A: Ident("test/flag"), V: Bool(false)},
+		},
+		Retractions: []Retraction{},
+	}
+	assert.Equal(t, expected, actual)
+}
+
 func TestStructSliceFields(t *testing.T) {
 	// Note this will produce datums equivalent to the scalar example above, the only difference being
 	// that the Run structs have room to record/represent other data.

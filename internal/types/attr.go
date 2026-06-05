@@ -6,8 +6,6 @@ type Attr struct {
 	ID ID `attr:"sys/db/id"`
 	// Ident is the public identifier of an attribute.
 	Ident Ident `attr:"sys/db/ident"`
-	// TODO might it be useful to have a type for an Ident referred to by
-	// an ID for unique attrs?
 	// Type specifies the type of values to which the attribute refers.
 	Type ID `attr:"sys/attr/type"`
 	// Cardinality specifies the number of values an attribute may have on a given entity.

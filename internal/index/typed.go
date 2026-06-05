@@ -54,8 +54,6 @@ type TypedIndex[X cmp.Ordered] interface {
 }
 
 type btreeIndex[X cmp.Ordered] struct {
-	// TODO the struct isn't necessary or even desirable unless we have more things to say about
-	// our trees, but I could not express this as a generically typed type alias.
 	tree *btree.BTreeG[TypedDatum[X]]
 }
 

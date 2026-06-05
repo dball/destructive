@@ -178,7 +178,7 @@ func (s *shredder) assert(confetti *confetti, x any) (e TempID, claims []Claim, 
 			for i, vv := range v {
 				var refFieldClaims []Claim
 				if attr.CollValue != "" {
-					vvv, ok := ToVRef(vv)
+					vvv, ok := vv.(VRef)
 					if !ok {
 						err = NewError("shredder.invalidSliceValue")
 						return
