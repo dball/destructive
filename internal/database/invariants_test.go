@@ -309,9 +309,7 @@ func TestWriteErrorLeavesDatabaseIntact(t *testing.T) {
 }
 
 // TestSnapshotQueryRouting locks down the snapshot query surface across every shape
-// of claim. The "filtered shapes" and "all datums" subtests cover shapes that once
-// panicked with TODO markers instead of returning results; the assert.NotPanics
-// guards remain as regression guards against any shape panicking again.
+// of claim: indexed shapes, value-filtered shapes, and the unconstrained scan.
 func TestSnapshotQueryRouting(t *testing.T) {
 	db := newPersonDB(t)
 	res := db.Write(Request{Claims: []Claim{
@@ -341,26 +339,22 @@ func TestSnapshotQueryRouting(t *testing.T) {
 	})
 
 	t.Run("filtered shapes", func(t *testing.T) {
-		assert.NotPanics(t, func() {
-			// (E,A,V) present and absent
-			assert.Equal(t, []Datum{ageDatum}, slices.Collect(view.Select(Claim{E: id, A: Ident("person/age"), V: Int(49)})))
-			assert.Empty(t, slices.Collect(view.Select(Claim{E: id, A: Ident("person/age"), V: Int(999)})))
-			assert.Equal(t, 1, view.Count(Claim{E: id, A: Ident("person/age"), V: Int(49)}))
-			// (E,*,V): the entity's datums filtered by value
-			assert.Equal(t, []Datum{ageDatum}, slices.Collect(view.Select(Claim{E: id, V: Int(49)})))
-			// (*,*,V): every datum with that value (scans all, including system datums)
-			assert.Equal(t, []Datum{ageDatum}, slices.Collect(view.Select(Claim{V: Int(49)})))
-			assert.Equal(t, 1, view.Count(Claim{V: Int(49)}))
-		})
+		// (E,A,V) present and absent
+		assert.Equal(t, []Datum{ageDatum}, slices.Collect(view.Select(Claim{E: id, A: Ident("person/age"), V: Int(49)})))
+		assert.Empty(t, slices.Collect(view.Select(Claim{E: id, A: Ident("person/age"), V: Int(999)})))
+		assert.Equal(t, 1, view.Count(Claim{E: id, A: Ident("person/age"), V: Int(49)}))
+		// (E,*,V): the entity's datums filtered by value
+		assert.Equal(t, []Datum{ageDatum}, slices.Collect(view.Select(Claim{E: id, V: Int(49)})))
+		// (*,*,V): every datum with that value (scans all, including system datums)
+		assert.Equal(t, []Datum{ageDatum}, slices.Collect(view.Select(Claim{V: Int(49)})))
+		assert.Equal(t, 1, view.Count(Claim{V: Int(49)}))
 	})
 
 	t.Run("all datums", func(t *testing.T) {
-		assert.NotPanics(t, func() {
-			all := slices.Collect(view.Select(Claim{}))
-			assert.Equal(t, view.Count(Claim{}), len(all))
-			assert.Contains(t, all, ageDatum)
-			assert.Greater(t, len(all), 2, "includes system datums plus the user datums")
-		})
+		all := slices.Collect(view.Select(Claim{}))
+		assert.Equal(t, view.Count(Claim{}), len(all))
+		assert.Contains(t, all, ageDatum)
+		assert.Greater(t, len(all), 2, "includes system datums plus the user datums")
 	})
 }
 
