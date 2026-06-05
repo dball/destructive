@@ -15,7 +15,6 @@ type indexDatabase struct {
 	eav index.Index
 	aev index.Index
 	ave index.Index
-	vae index.Index
 
 	attrsByID      map[ID]Attr
 	attrsByIdent   map[Ident]Attr
@@ -54,8 +53,6 @@ func NewIndexDatabase(degree int, attrsSize int, identsSize int) (db Database) {
 	eav := index.NewCompositeIndex(degree, index.EAVIndex, attrTypes)
 	aev := index.NewCompositeIndex(degree, index.AEVIndex, attrTypes)
 	ave := index.NewCompositeIndex(degree, index.AVEIndex, attrTypes)
-	// TODO vae will only ever need a uint typed index
-	vae := index.NewCompositeIndex(degree, index.VAEIndex, attrTypes)
 	// Bootstrap the system datums by writing to the appropriate indexes directly.
 	for _, datum := range sys.Datums {
 		eav.Insert(datum)
@@ -64,15 +61,11 @@ func NewIndexDatabase(degree int, attrsSize int, identsSize int) (db Database) {
 		if ok {
 			ave.Insert(datum)
 		}
-		if attrTypes[datum.A] == sys.AttrTypeRef {
-			vae.Insert(datum)
-		}
 	}
 	db = &indexDatabase{
 		eav:            eav,
 		aev:            aev,
 		ave:            ave,
-		vae:            vae,
 		attrsByID:      attrsByID,
 		attrsByIdent:   attrsByIdent,
 		attrTypes:      attrTypes,
@@ -99,7 +92,6 @@ func (db *indexDatabase) read() (snapshot Snapshot) {
 		eav: db.eav.Clone(),
 		aev: db.aev.Clone(),
 		ave: db.ave.Clone(),
-		vae: db.vae.Clone(),
 		// These are probably more expensive to copy than the btrees. Maybe we could do cow here?
 		idents: idents,
 		attrs:  attrs,
@@ -291,8 +283,6 @@ CLAIMS:
 		aev := db.aev.Clone()
 		// Could defer this clone until we know we need it
 		ave := db.ave.Clone()
-		// Could defer this clone until we know we need it
-		vae := db.vae.Clone()
 		// We could consider transacting into the indexes concurrently.
 		for i, datum := range data {
 			claim := claims[i]
@@ -329,9 +319,6 @@ CLAIMS:
 							if ok {
 								ave.Delete(d)
 							}
-							if db.attrTypes[datum.A] == sys.AttrTypeRef {
-								vae.Delete(d)
-							}
 						}
 					}
 				}
@@ -341,9 +328,6 @@ CLAIMS:
 				if ok {
 					ave.Insert(*datum)
 				}
-				if db.attrTypes[datum.A] == sys.AttrTypeRef {
-					vae.Insert(*datum)
-				}
 			} else {
 				eav.Delete(*datum)
 				aev.Delete(*datum)
@@ -351,15 +335,11 @@ CLAIMS:
 				if ok {
 					ave.Delete(*datum)
 				}
-				if db.attrTypes[datum.A] == sys.AttrTypeRef {
-					vae.Delete(*datum)
-				}
 			}
 		}
 		db.eav = eav
 		db.aev = aev
 		db.ave = ave
-		db.vae = vae
 		for _, ident := range identDeletes {
 			delete(db.idents, ident)
 		}

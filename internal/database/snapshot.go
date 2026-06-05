@@ -12,7 +12,6 @@ type indexSnapshot struct {
 	eav    index.Index
 	aev    index.Index
 	ave    index.Index
-	vae    index.Index
 	idents map[Ident]ID
 	attrs  map[ID]Attr
 }
@@ -116,8 +115,6 @@ func (snapshot *indexSnapshot) resolveLookupRef(ref LookupRef) (id ID) {
 	default:
 		return
 	}
-	// Only unique attributes are maintained in the ave index, so a lookup ref against
-	// any other attribute cannot resolve to a single entity.
 	if snapshot.attrs[datum.A].Unique == 0 {
 		return
 	}
