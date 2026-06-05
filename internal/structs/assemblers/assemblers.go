@@ -313,13 +313,8 @@ func (as *assembler) addEntityToSlice(collValue Ident, slice reflect.Value, id I
 	}
 }
 
-func Assemble[T any](as *assembler, id ID, entityPointer *T) (entity *T, err error) {
-	pointerType := reflect.TypeOf(entityPointer)
-	if pointerType.Kind() != reflect.Pointer {
-		err = NewError("assembler.destNotPointer")
-		return
-	}
-	structType := pointerType.Elem()
+func Assemble[T any](as *assembler, id ID) (entity *T, err error) {
+	structType := reflect.TypeFor[T]()
 	_, modelErr := as.analyzer.Analyze(structType)
 	if modelErr != nil {
 		err = modelErr
@@ -327,7 +322,7 @@ func Assemble[T any](as *assembler, id ID, entityPointer *T) (entity *T, err err
 	}
 	instance, ok := as.instances[id]
 	if !ok {
-		as.allocate(id, pointerType)
+		as.allocate(id, reflect.TypeFor[*T]())
 		err = as.assembleAll()
 		if err != nil {
 			return

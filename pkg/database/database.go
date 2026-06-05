@@ -25,7 +25,6 @@ type Snapshot struct {
 
 type typedSnapshot[T any] struct {
 	snapshot *Snapshot
-	pointer  *T
 }
 
 // TypedSnapshot is an immutable set of data that can build instances of specific
@@ -37,19 +36,14 @@ type TypedSnapshot[T any] interface {
 func (ts *typedSnapshot[T]) Find(id uint64) (entity *T) {
 	assembler := assemblers.NewAssembler(ts.snapshot.analyzer, ts.snapshot.snap)
 	// TODO log the error or something?
-	entity, _ = assemblers.Assemble(assembler, types.ID(id), ts.pointer)
+	entity, _ = assemblers.Assemble[T](assembler, types.ID(id))
 	return
 }
 
-func BuildTypedSnapshot[T any](snapshot *Snapshot, pointer *T) (ts TypedSnapshot[T], err error) {
-	typ := reflect.TypeOf(pointer)
-	if typ.Kind() != reflect.Pointer {
-		err = types.NewError("database.invalidStructPointer", "type", typ)
-		return
-	}
-	_, err = models.Analyze(typ.Elem())
+func BuildTypedSnapshot[T any](snapshot *Snapshot) (ts TypedSnapshot[T], err error) {
+	_, err = models.Analyze(reflect.TypeFor[T]())
 	if err == nil {
-		ts = &typedSnapshot[T]{snapshot: snapshot, pointer: pointer}
+		ts = &typedSnapshot[T]{snapshot: snapshot}
 	}
 	return
 }

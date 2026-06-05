@@ -62,7 +62,7 @@ func TestSimple(t *testing.T) {
 	id := res.TempIDs[TempID("1")]
 	assert.Positive(t, id)
 	assembler := NewAssembler(analyzer, res.Snapshot)
-	entity, err := Assemble(assembler, id, (*Person)(nil))
+	entity, err := Assemble[Person](assembler, id)
 	assert.NoError(t, err)
 	title := "Citizen"
 	zero := 0
@@ -111,7 +111,7 @@ func TestStructs(t *testing.T) {
 	id := res.TempIDs[TempID("1")]
 
 	assembler := NewAssembler(analyzer, res.Snapshot)
-	entity, err := Assemble(assembler, id, (*Person)(nil))
+	entity, err := Assemble[Person](assembler, id)
 	assert.NoError(t, err)
 	expected := Person{Name: "Donald", Favorite: Book{Title: "Immortality"}, Best: &Book{Title: "The Parable of the Sower"}}
 	assert.Equal(t, expected, *entity)
@@ -138,7 +138,7 @@ func TestStructCycles(t *testing.T) {
 	pabu := res.TempIDs[TempID("2")]
 
 	assembler := NewAssembler(analyzer, res.Snapshot)
-	entity, err := Assemble(assembler, momo, (*Person)(nil))
+	entity, err := Assemble[Person](assembler, momo)
 	assert.NoError(t, err)
 
 	// We cannot assert equality on the structs themselves because they
@@ -147,7 +147,7 @@ func TestStructCycles(t *testing.T) {
 	assert.Equal(t, "Pabu", entity.BFF.Name)
 	assert.Equal(t, "Momo", entity.BFF.BFF.Name)
 
-	entity, err = Assemble(assembler, pabu, (*Person)(nil))
+	entity, err = Assemble[Person](assembler, pabu)
 	assert.NoError(t, err)
 	assert.Equal(t, "Pabu", entity.Name)
 	assert.Equal(t, "Momo", entity.BFF.Name)
@@ -179,7 +179,7 @@ func TestMapWithStructValues(t *testing.T) {
 	res := db.Write(req)
 	assert.NoError(t, res.Error)
 	assembler := NewAssembler(analyzer, res.Snapshot)
-	entity, err := Assemble(assembler, res.TempIDs[TempID("1")], (*Person)(nil))
+	entity, err := Assemble[Person](assembler, res.TempIDs[TempID("1")])
 	assert.NoError(t, err)
 
 	assert.Equal(t, "Donald", entity.Name)
@@ -213,7 +213,7 @@ func TestMapWithPointerValues(t *testing.T) {
 	res := db.Write(req)
 	assert.NoError(t, res.Error)
 	assembler := NewAssembler(analyzer, res.Snapshot)
-	entity, err := Assemble(assembler, res.TempIDs[TempID("1")], (*Person)(nil))
+	entity, err := Assemble[Person](assembler, res.TempIDs[TempID("1")])
 	assert.NoError(t, err)
 
 	assert.Equal(t, "Donald", entity.Name)
@@ -247,7 +247,7 @@ func TestSliceOfStructValues(t *testing.T) {
 	res := db.Write(req)
 	assert.NoError(t, res.Error)
 	assembler := NewAssembler(analyzer, res.Snapshot)
-	entity, err := Assemble(assembler, res.TempIDs[TempID("1")], (*Person)(nil))
+	entity, err := Assemble[Person](assembler, res.TempIDs[TempID("1")])
 	assert.NoError(t, err)
 
 	expected := Person{
@@ -284,7 +284,7 @@ func TestSliceOfScalarValues(t *testing.T) {
 	res := db.Write(req)
 	assert.NoError(t, res.Error)
 	assembler := NewAssembler(analyzer, res.Snapshot)
-	entity, err := Assemble(assembler, res.TempIDs[TempID("1")], (*Test)(nil))
+	entity, err := Assemble[Test](assembler, res.TempIDs[TempID("1")])
 	assert.NoError(t, err)
 
 	expected := Test{
